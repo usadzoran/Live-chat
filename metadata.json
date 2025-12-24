@@ -1,0 +1,8 @@
+{
+  "name": "Gemini Live Streamer",
+  "description": "A high-performance live streaming platform where users can interact with Gemini AI in real-time using voice and video.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
