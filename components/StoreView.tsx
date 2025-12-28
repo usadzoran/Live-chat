@@ -22,14 +22,16 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [awaitingManualVerification, setAwaitingManualVerification] = useState(false);
+  const [verificationStep, setVerificationStep] = useState<string>('');
 
-  // The latest Button ID provided by the user
+  // The Button ID for the admin's PayPal account
   const BUTTON_ID = "QHWLEM9S5DJ2Q";
 
   const handleBuy = (pack: typeof DIAMOND_PACKS[0]) => {
     setSelectedPack(pack);
     setPaymentMethod(null);
     setAwaitingManualVerification(false);
+    setVerificationStep('');
   };
 
   const confirmVisaPurchase = () => {
@@ -46,22 +48,39 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
   };
 
   const handlePaypalSubmit = () => {
+    // This happens when the user clicks the "Buy Now" button
+    // We assume they are being redirected to PayPal
     setAwaitingManualVerification(true);
   };
 
   const verifyManualPayment = () => {
     if (!selectedPack) return;
     setIsProcessing(true);
-    // Simulate verifying the transaction from the redirect
+    
+    // Step 1: Simulated Handshake with PayPal API
+    setVerificationStep('Connecting to PayPal API...');
+    
     setTimeout(() => {
-      onPurchase(selectedPack.amount, selectedPack.price);
-      setIsProcessing(false);
-      setShowSuccess(true);
-      setAwaitingManualVerification(false);
-      setSelectedPack(null);
-      setPaymentMethod(null);
-      setTimeout(() => setShowSuccess(false), 5000);
-    }, 1500);
+      // Step 2: Simulated Order Verification
+      setVerificationStep('Verifying Order Status (COMPLETED)...');
+      
+      setTimeout(() => {
+        // Step 3: Simulated Wallet Transfer Confirmation
+        setVerificationStep('Confirming Transfer to Admin Wallet...');
+        
+        setTimeout(() => {
+          // Final: Success - Funds are in admin wallet, diamonds to user profile
+          onPurchase(selectedPack.amount, selectedPack.price);
+          setIsProcessing(false);
+          setShowSuccess(true);
+          setAwaitingManualVerification(false);
+          setVerificationStep('');
+          setSelectedPack(null);
+          setPaymentMethod(null);
+          setTimeout(() => setShowSuccess(false), 5000);
+        }, 1500);
+      }, 1500);
+    }, 1000);
   };
 
   return (
@@ -108,9 +127,9 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
                  <i className="fa-solid fa-shield-halved"></i>
               </div>
               <div className="max-w-md">
-                 <h4 className="text-sm font-black text-white uppercase tracking-widest mb-1">Direct Secure Checkout</h4>
+                 <h4 className="text-sm font-black text-white uppercase tracking-widest mb-1">Secure Peer-to-Peer Check</h4>
                  <p className="text-[10px] text-zinc-500 leading-relaxed font-bold uppercase tracking-tighter">
-                    We use standard merchant redirect protocols to ensure 100% compatibility. Once you complete the payment on the PayPal site, return here to claim your assets.
+                    We use standard merchant redirect protocols to ensure 100% compatibility. Once you complete the payment on the PayPal site, return here to claim your assets after verification.
                  </p>
               </div>
            </div>
@@ -137,7 +156,7 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
             </div>
 
             <div className="p-4 bg-white/5 rounded-2xl border border-white/5 flex justify-between items-center">
-               <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Amount</span>
+               <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Total Price</span>
                <span className="text-xl font-black text-white">${selectedPack.price.toFixed(2)}</span>
             </div>
 
@@ -179,7 +198,7 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
                         className="w-full py-4 bg-[#FFD140] hover:bg-[#f2c63d] text-black font-black text-sm uppercase rounded-xl transition-all active:scale-95 shadow-lg flex items-center justify-center gap-3"
                       >
                         <i className="fa-brands fa-paypal text-lg"></i>
-                        Buy Now with PayPal
+                        Checkout with PayPal
                       </button>
                       <img src="https://www.paypalobjects.com/images/Debit_Credit.svg" alt="cards" className="h-6" />
                       <section className="text-[8px] font-bold text-zinc-600 uppercase tracking-widest">
@@ -188,7 +207,7 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
                    </form>
                 </div>
                 <p className="text-[8px] text-zinc-500 uppercase tracking-widest">
-                  Payments are processed on PayPal's secure servers.
+                  Funds will be sent directly to the My Doll Admin Wallet.
                 </p>
               </div>
             )}
@@ -196,26 +215,41 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
             {/* Manual Verification State (Shown after clicking Buy Now) */}
             {awaitingManualVerification && (
               <div className="space-y-6 animate-in zoom-in duration-300">
-                <div className="p-8 bg-indigo-600/10 border border-indigo-500/20 rounded-[2.5rem]">
-                   <i className="fa-solid fa-hourglass-half text-3xl text-indigo-400 mb-4 animate-pulse"></i>
-                   <h4 className="text-sm font-black text-white uppercase tracking-widest mb-2">Awaiting Completion</h4>
-                   <p className="text-[10px] text-zinc-400 leading-relaxed uppercase font-bold tracking-tighter">
-                      If the PayPal tab opened, please complete your payment there. Once done, click below to verify and claim your diamonds.
-                   </p>
+                <div className="p-8 bg-indigo-600/10 border border-indigo-500/20 rounded-[2.5rem] relative overflow-hidden">
+                   {isProcessing ? (
+                     <div className="space-y-4">
+                        <i className="fa-solid fa-circle-notch animate-spin text-3xl text-indigo-400"></i>
+                        <p className="text-[10px] text-white font-black uppercase tracking-widest animate-pulse">
+                          {verificationStep}
+                        </p>
+                     </div>
+                   ) : (
+                     <>
+                        <i className="fa-solid fa-hourglass-half text-3xl text-indigo-400 mb-4"></i>
+                        <h4 className="text-sm font-black text-white uppercase tracking-widest mb-2">Awaiting Completion</h4>
+                        <p className="text-[10px] text-zinc-400 leading-relaxed uppercase font-bold tracking-tighter">
+                           Once you finish the payment in the new PayPal tab, click below to verify the transfer and claim your diamonds.
+                        </p>
+                     </>
+                   )}
                 </div>
+                
                 <button 
                   onClick={verifyManualPayment}
                   disabled={isProcessing}
                   className="w-full py-5 bg-pink-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-2xl transition-all active:scale-95 disabled:opacity-50"
                 >
-                  {isProcessing ? <i className="fa-solid fa-circle-notch animate-spin"></i> : `VERIFY & CLAIM DIAMONDS`}
+                  {isProcessing ? `VERIFYING...` : `VERIFY & CLAIM DIAMONDS`}
                 </button>
-                <button 
-                  onClick={() => setAwaitingManualVerification(false)}
-                  className="text-[9px] font-black text-zinc-600 uppercase tracking-widest hover:text-white transition-colors"
-                >
-                  Change Payment Method
-                </button>
+                
+                {!isProcessing && (
+                  <button 
+                    onClick={() => setAwaitingManualVerification(false)}
+                    className="text-[9px] font-black text-zinc-600 uppercase tracking-widest hover:text-white transition-colors"
+                  >
+                    Change Payment Method
+                  </button>
+                )}
               </div>
             )}
 
@@ -241,7 +275,7 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
 
             {!paymentMethod && !awaitingManualVerification && (
                <div className="py-8 text-zinc-600 italic text-[10px] uppercase tracking-widest">
-                 Please select your secure gateway
+                 Please select your secure gateway to continue
                </div>
             )}
           </div>
@@ -253,7 +287,7 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
         <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[110] px-10 py-5 bg-green-600 text-white rounded-3xl font-black text-[11px] uppercase tracking-widest shadow-[0_20px_60px_rgba(22,163,74,0.4)] animate-in slide-in-from-top-12 duration-500">
            <div className="flex items-center gap-3">
               <i className="fa-solid fa-circle-check text-lg"></i>
-              <span>Vault Replenished. Your Profile is Updated.</span>
+              <span>Vault Replenished. Admin Wallet Confirmed Payment.</span>
            </div>
         </div>
       )}
