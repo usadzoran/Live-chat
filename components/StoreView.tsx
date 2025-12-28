@@ -22,6 +22,12 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const paypalContainerRef = useRef<HTMLDivElement>(null);
+  const selectedPackRef = useRef<typeof DIAMOND_PACKS[0] | null>(null);
+
+  // Keep a ref to the selected pack so the PayPal callback can access the latest value
+  useEffect(() => {
+    selectedPackRef.current = selectedPack;
+  }, [selectedPack]);
 
   const handleBuy = (pack: typeof DIAMOND_PACKS[0]) => {
     setSelectedPack(pack);
@@ -32,7 +38,7 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
     if (!selectedPack || !paymentMethod) return;
     
     if (paymentMethod === 'paypal') {
-        // PayPal button handles its own flow once rendered
+        // PayPal button renders and handles its own flow
         return;
     }
 
@@ -53,18 +59,36 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
       // Clean up previous renders if any
       paypalContainerRef.current.innerHTML = '';
       
-      // Check if PayPal SDK is available
-      if ((window as any).paypal) {
-        (window as any).paypal.HostedButtons({
-          hostedButtonId: "MUH345U2QKVG8", // Using the ID provided by user
+      const pp = (window as any).paypal;
+      if (pp && pp.HostedButtons) {
+        pp.HostedButtons({
+          hostedButtonId: "MUH345U2QKVG8",
+          // The onApprove callback is triggered when the user successfully pays
+          onApprove: (data: any, actions: any) => {
+            console.log("PayPal Payment Approved:", data);
+            const pack = selectedPackRef.current;
+            if (pack) {
+              onPurchase(pack.amount);
+              setShowSuccess(true);
+              setTimeout(() => setShowSuccess(false), 4000);
+              setSelectedPack(null);
+              setPaymentMethod(null);
+            }
+          },
+          onCancel: () => {
+            console.log("PayPal Payment Cancelled");
+          },
+          onError: (err: any) => {
+            console.error("PayPal Error:", err);
+          }
         }).render(`#${paypalContainerRef.current.id}`).catch((err: any) => {
             console.error("PayPal button rendering failed", err);
         });
       } else {
-        console.error("PayPal SDK not found");
+        console.error("PayPal SDK or HostedButtons component not found");
       }
     }
-  }, [paymentMethod, selectedPack]);
+  }, [paymentMethod, selectedPack, onPurchase]);
 
   return (
     <div className="max-w-4xl mx-auto h-full flex flex-col gap-6 overflow-y-auto pb-32 hide-scrollbar">
@@ -208,15 +232,15 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
 
             {paymentMethod === 'paypal' && (
               <div className="space-y-4 animate-in slide-in-from-top-2">
-                <div className="p-6 bg-blue-600/10 border border-blue-500/20 rounded-2xl text-center min-h-[120px] flex items-center justify-center">
-                    <div id="paypal-container-MUH345U2QKVG8" ref={paypalContainerRef} className="w-full flex justify-center">
+                <div className="p-6 bg-blue-600/10 border border-blue-500/20 rounded-2xl text-center min-h-[160px] flex flex-col items-center justify-center">
+                    <div id="paypal-container-MUH345U2QKVG8" ref={paypalContainerRef} className="w-full flex justify-center py-2">
                         <div className="animate-pulse flex flex-col items-center gap-2">
                             <i className="fa-brands fa-paypal text-2xl text-blue-400"></i>
-                            <span className="text-[10px] text-blue-300 font-bold">Initializing Secure Checkout...</span>
+                            <span className="text-[10px] text-blue-300 font-bold uppercase tracking-widest">Loading Secure Button...</span>
                         </div>
                     </div>
+                    <p className="text-[8px] text-zinc-500 uppercase tracking-widest mt-2">Diamonds are credited automatically after payment</p>
                 </div>
-                <p className="text-[8px] text-zinc-500 uppercase tracking-widest">Diamonds credited instantly after PayPal confirmation</p>
               </div>
             )}
 
@@ -232,7 +256,7 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
       {/* Success Toast */}
       {showSuccess && (
         <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[110] px-8 py-4 bg-green-600 text-white rounded-full font-black text-[10px] uppercase tracking-widest shadow-2xl animate-in slide-in-from-top-12 duration-500">
-           <i className="fa-solid fa-check mr-2"></i> Diamonds Credited to your Vault
+           <i className="fa-solid fa-check mr-2"></i> Diamonds Credited to your Vault!
         </div>
       )}
     </div>
