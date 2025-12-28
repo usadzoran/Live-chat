@@ -18,12 +18,15 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onNavigate }) => {
           className="flex items-center gap-3 cursor-pointer group" 
           onClick={() => onNavigate('feed')}
         >
-          <div className="w-10 h-10 rounded-xl stream-gradient flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:scale-105 transition-transform">
-            <i className="fa-solid fa-broadcast-tower text-white text-xl"></i>
+          <div className="w-10 h-10 rounded-2xl stream-gradient flex items-center justify-center shadow-lg shadow-pink-500/20 group-hover:scale-110 transition-all duration-300">
+            <i className="fa-solid fa-face-grin-stars text-white text-xl"></i>
           </div>
-          <div>
-            <h1 className="text-xl font-bold bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent">GeminiSocial</h1>
-            <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold -mt-1">Connect & Share</p>
+          <div className="flex flex-col">
+            <h1 className="text-xl tracking-tighter leading-none">
+              <span className="font-light text-zinc-400">My</span>
+              <span className="font-black text-white ml-1">Doll</span>
+            </h1>
+            <p className="text-[8px] text-pink-500 uppercase tracking-[0.3em] font-black mt-1">Live Social</p>
           </div>
         </div>
 
@@ -51,7 +54,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onNavigate }) => {
           className="relative w-10 h-10 rounded-xl bg-white/5 border border-white/5 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/10 transition-all"
         >
           <i className="fa-solid fa-bell"></i>
-          <span className="absolute top-2 right-2 w-2 h-2 bg-indigo-500 rounded-full border border-zinc-950"></span>
+          <span className="absolute top-2 right-2 w-2 h-2 bg-pink-500 rounded-full border border-zinc-950"></span>
         </button>
 
         <div className="h-8 w-[1px] bg-zinc-800 mx-2"></div>
@@ -62,11 +65,11 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, onNavigate }) => {
             className="flex items-center gap-3 hover:bg-white/5 p-1 pr-3 rounded-full transition-colors group"
           >
             <div className="w-8 h-8 rounded-full border border-zinc-700 bg-zinc-800 flex items-center justify-center overflow-hidden">
-               <img src={`https://ui-avatars.com/api/?name=${user?.name || 'User'}&background=6366f1&color=fff`} alt="avatar" />
+               <img src={`https://ui-avatars.com/api/?name=${user?.name || 'User'}&background=f472b6&color=fff`} alt="avatar" />
             </div>
             <div className="text-left hidden md:block">
               <p className="text-xs font-bold text-white leading-none">{user?.name || 'Anonymous'}</p>
-              <p className="text-[10px] text-zinc-500 leading-none mt-1">Member</p>
+              <p className="text-[10px] text-zinc-500 leading-none mt-1">Creator</p>
             </div>
             <i className={`fa-solid fa-chevron-down text-[10px] text-zinc-600 group-hover:text-zinc-400 transition-transform ${showDropdown ? 'rotate-180' : ''}`}></i>
           </button>
