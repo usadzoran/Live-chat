@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 
 interface StoreViewProps {
   diamonds: number;
-  onPurchase: (amount: number) => void;
+  onPurchase: (diamondAmount: number, priceAmount: number) => void;
   onBack: () => void;
 }
 
@@ -36,7 +36,7 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
     if (!selectedPack) return;
     setIsProcessing(true);
     setTimeout(() => {
-      onPurchase(selectedPack.amount);
+      onPurchase(selectedPack.amount, selectedPack.price);
       setIsProcessing(false);
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 5000);
@@ -54,7 +54,7 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
     setIsProcessing(true);
     // Simulate verifying the transaction from the redirect
     setTimeout(() => {
-      onPurchase(selectedPack.amount);
+      onPurchase(selectedPack.amount, selectedPack.price);
       setIsProcessing(false);
       setShowSuccess(true);
       setAwaitingManualVerification(false);

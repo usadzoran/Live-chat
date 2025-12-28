@@ -2,7 +2,11 @@
 import React, { useState } from 'react';
 import { AdConfig } from '../types';
 
-const AdminDashboard: React.FC = () => {
+interface AdminDashboardProps {
+  totalRevenue: number;
+}
+
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ totalRevenue }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'moderation' | 'nodes' | 'ads' | 'treasury'>('overview');
   
   // Mocking Ad Settings State
@@ -16,7 +20,7 @@ const AdminDashboard: React.FC = () => {
   // Treasury Configuration State
   const [merchantConfig, setMerchantConfig] = useState({
     paypalEmail: 'admin@mydoll.club',
-    paypalButtonId: 'MUH345U2QKVG8',
+    paypalButtonId: 'QHWLEM9S5DJ2Q',
     visaMerchantId: 'MID-8842-990-X',
     gatewayProvider: 'Stripe Connect',
     isLiveMode: false,
@@ -32,7 +36,7 @@ const AdminDashboard: React.FC = () => {
   };
 
   const stats = [
-    { label: 'Total Revenue', value: '$842,500', trend: '+12.5%', icon: 'fa-sack-dollar', color: 'text-emerald-400' },
+    { label: 'Total Revenue', value: `$${totalRevenue.toLocaleString()}`, trend: '+12.5%', icon: 'fa-sack-dollar', color: 'text-emerald-400' },
     { label: 'Active Dolls', value: '124,052', trend: '+3.2%', icon: 'fa-user-astronaut', color: 'text-pink-400' },
     { label: 'Live Streams', value: '842', trend: '-1.4%', icon: 'fa-video', color: 'text-indigo-400' },
     { label: 'AI Latency', value: '42ms', trend: 'Stable', icon: 'fa-bolt', color: 'text-cyan-400' },
@@ -328,7 +332,7 @@ const AdminDashboard: React.FC = () => {
                  <div className="flex-1 space-y-4 text-center md:text-left">
                     <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Settlement Controls</h3>
                     <p className="text-[10px] text-zinc-500 uppercase tracking-widest leading-relaxed font-bold">
-                       Current Diamond Sales Volume is held in Platform Escrow. Trigger manual settlements or toggle environment mode.
+                       Current Diamond Sales Volume: <span className="text-white">${totalRevenue.toLocaleString()}</span>. Trigger manual settlements or toggle environment mode.
                     </p>
                     <div className="flex flex-wrap items-center gap-6 mt-4 justify-center md:justify-start">
                        <div className="flex items-center gap-3">
@@ -354,9 +358,9 @@ const AdminDashboard: React.FC = () => {
                  
                  <div className="shrink-0 flex flex-col gap-3">
                     <button className="px-12 py-5 bg-white text-black font-black text-[10px] uppercase tracking-[0.2em] rounded-2xl shadow-2xl hover:bg-zinc-200 transition-all active:scale-95">
-                       PUSH $12,450 TO BANK
+                       PUSH ${totalRevenue.toLocaleString()} TO BANK
                     </button>
-                    <p className="text-center text-[8px] font-black text-zinc-600 uppercase tracking-widest">Pending Clear: $2,100.42</p>
+                    <p className="text-center text-[8px] font-black text-zinc-600 uppercase tracking-widest">Verified Revenue Stream</p>
                  </div>
               </div>
             </div>

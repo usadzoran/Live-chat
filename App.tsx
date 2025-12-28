@@ -14,6 +14,7 @@ import BottomNav from './components/BottomNav';
 import { ViewType } from './types';
 
 const SESSION_KEY = 'mydoll_session_v1';
+const REVENUE_KEY = 'mydoll_platform_revenue';
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -21,8 +22,9 @@ const App: React.FC = () => {
   const [showAuth, setShowAuth] = useState(false);
   const [user, setUser] = useState<{ name: string; email: string; bio?: string; avatar?: string; cover?: string; diamonds: number } | null>(null);
   const [currentView, setCurrentView] = useState<ViewType>('feed');
+  const [platformRevenue, setPlatformRevenue] = useState<number>(0);
 
-  // Load session from localStorage on mount
+  // Load session and revenue from localStorage on mount
   useEffect(() => {
     const savedSession = localStorage.getItem(SESSION_KEY);
     if (savedSession) {
@@ -31,7 +33,6 @@ const App: React.FC = () => {
         setUser(savedUser);
         setIsAdmin(savedIsAdmin);
         setIsAuthenticated(true);
-        // If they were on admin, stay on admin, else go to feed
         if (savedIsAdmin && window.location.hash === '#/admin-portal') {
           setCurrentView('admin');
         }
@@ -39,9 +40,16 @@ const App: React.FC = () => {
         localStorage.removeItem(SESSION_KEY);
       }
     }
+
+    const savedRevenue = localStorage.getItem(REVENUE_KEY);
+    if (savedRevenue) {
+      setPlatformRevenue(parseFloat(savedRevenue));
+    } else {
+      setPlatformRevenue(842500); // Initial mock revenue
+    }
   }, []);
 
-  // Sync session to localStorage whenever auth state changes
+  // Sync session to localStorage
   useEffect(() => {
     if (isAuthenticated && user) {
       localStorage.setItem(SESSION_KEY, JSON.stringify({ user, isAdmin }));
@@ -49,6 +57,11 @@ const App: React.FC = () => {
       localStorage.removeItem(SESSION_KEY);
     }
   }, [isAuthenticated, user, isAdmin]);
+
+  // Sync revenue to localStorage
+  useEffect(() => {
+    localStorage.setItem(REVENUE_KEY, platformRevenue.toString());
+  }, [platformRevenue]);
 
   // Secret Link Detection
   useEffect(() => {
@@ -58,7 +71,7 @@ const App: React.FC = () => {
       }
     };
     window.addEventListener('hashchange', handleHashChange);
-    handleHashChange(); // Check on mount
+    handleHashChange();
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
@@ -101,6 +114,13 @@ const App: React.FC = () => {
     localStorage.removeItem(SESSION_KEY);
   };
 
+  const handlePurchase = (diamondAmount: number, priceAmount: number) => {
+    // 1. Update user profile diamonds
+    handleUpdateUser({ diamonds: (user?.diamonds || 0) + diamondAmount });
+    // 2. Update Admin Wallet (Platform Revenue)
+    setPlatformRevenue(prev => prev + priceAmount);
+  };
+
   if (!isAuthenticated) {
     if (showAuth) {
       return <AuthPage onLogin={handleLogin} onBack={() => {
@@ -124,9 +144,13 @@ const App: React.FC = () => {
       case 'live':
         return <LiveBroadcasterView />;
       case 'admin':
-        return <AdminDashboard />;
+        return <AdminDashboard totalRevenue={platformRevenue} />;
       case 'store':
-        return <StoreView diamonds={user?.diamonds || 0} onPurchase={(amount) => handleUpdateUser({ diamonds: (user?.diamonds || 0) + amount })} onBack={() => setCurrentView('feed')} />;
+        return <StoreView 
+          diamonds={user?.diamonds || 0} 
+          onPurchase={handlePurchase} 
+          onBack={() => setCurrentView('feed')} 
+        />;
       default:
         return <FeedPage user={user!} />;
     }
