@@ -10,9 +10,9 @@ const LiveBroadcasterView: React.FC = () => {
   const [status, setStatus] = useState<StreamStatus>(StreamStatus.IDLE);
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [isCamOff, setIsCamOff] = useState(false);
-  const [title, setTitle] = useState("Exploring the Future of Social AI");
+  const [title, setTitle] = useState("Exclusive VIP Session");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [coins, setCoins] = useState(12450);
+  const [coins, setCoins] = useState(25000);
   
   const [service] = useState(() => new GeminiLiveService());
 
@@ -65,32 +65,40 @@ const LiveBroadcasterView: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col md:flex-row gap-6 max-w-[1600px] mx-auto">
-      <div className="flex-[2] flex flex-col gap-6 h-full overflow-hidden">
-        <StreamView 
-          status={status} 
-          isCamOff={isCamOff} 
-          title={title} 
-          onTitleChange={setTitle} 
-        />
-        <ControlBar 
-          status={status}
-          isMicMuted={isMicMuted}
-          isCamOff={isCamOff}
-          onStart={handleStart}
-          onStop={handleStop}
-          onToggleMic={() => {
-            setIsMicMuted(!isMicMuted);
-            service.setMicEnabled(isMicMuted);
-          }}
-          onToggleCam={() => {
-            setIsCamOff(!isCamOff);
-            service.setCamEnabled(isCamOff);
-          }}
-        />
+    <div className="h-full flex flex-col lg:flex-row gap-4 lg:gap-6 max-w-[1800px] mx-auto overflow-hidden">
+      {/* Primary Video & Controls Section */}
+      <div className="flex-1 lg:flex-[2] flex flex-col gap-4 lg:gap-6 h-full overflow-hidden min-h-0">
+        <div className="flex-1 min-h-0">
+          <StreamView 
+            status={status} 
+            isCamOff={isCamOff} 
+            title={title} 
+            onTitleChange={setTitle} 
+          />
+        </div>
+        
+        {/* Responsive Control Bar */}
+        <div className="shrink-0 pb-1 lg:pb-0">
+          <ControlBar 
+            status={status}
+            isMicMuted={isMicMuted}
+            isCamOff={isCamOff}
+            onStart={handleStart}
+            onStop={handleStop}
+            onToggleMic={() => {
+              setIsMicMuted(!isMicMuted);
+              service.setMicEnabled(!isMicMuted);
+            }}
+            onToggleCam={() => {
+              setIsCamOff(!isCamOff);
+              service.setCamEnabled(!isCamOff);
+            }}
+          />
+        </div>
       </div>
 
-      <div className="flex-1 h-full min-w-[320px] max-w-[450px]">
+      {/* Responsive Chat Panel Section */}
+      <div className="flex-1 lg:flex-none lg:w-[400px] xl:w-[450px] min-h-[300px] lg:h-full overflow-hidden">
         <ChatPanel 
           messages={messages} 
           userCoins={coins}

@@ -3,17 +3,30 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>My Doll | Next-Gen Social Club</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        :root {
+          --sat: env(safe-area-inset-top);
+          --sar: env(safe-area-inset-right);
+          --sab: env(safe-area-inset-bottom);
+          --sal: env(safe-area-inset-left);
+        }
         body {
             background-color: #09090b;
             color: #fafafa;
             margin: 0;
             overflow: hidden;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            height: 100dvh;
+            width: 100vw;
+            -webkit-tap-highlight-color: transparent;
+        }
+        #root {
+            height: 100%;
+            width: 100%;
         }
         .glass-panel {
             background: rgba(24, 24, 27, 0.75);
@@ -23,17 +36,14 @@
         .stream-gradient {
             background: linear-gradient(135deg, #f472b6 0%, #a855f7 100%);
         }
-        .doll-gradient-text {
-            background: linear-gradient(to right, #ffffff, #f472b6);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+        .animate-gradient {
+            background-size: 300% 300%;
+            animation: move-gradient 4s ease infinite;
         }
-        .animate-pulse-slow {
-            animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: .5; }
+        @keyframes move-gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
         }
         .hide-scrollbar::-webkit-scrollbar {
             display: none;
@@ -41,6 +51,10 @@
         .hide-scrollbar {
             -ms-overflow-style: none;
             scrollbar-width: none;
+        }
+        /* Mobile safe area padding helper */
+        .pb-safe {
+            padding-bottom: var(--sab);
         }
     </style>
     <script type="importmap">

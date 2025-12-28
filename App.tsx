@@ -18,7 +18,7 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewType>('feed');
 
   const handleLogin = (name: string, email: string) => {
-    setUser({ name, email, bio: "Digital creator and AI enthusiast." });
+    setUser({ name, email, bio: "Elite member and digital connoisseur." });
     setIsAuthenticated(true);
   };
 
@@ -58,7 +58,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen w-full bg-zinc-950 font-sans text-zinc-100 selection:bg-indigo-500/30">
+    <div className="flex flex-col h-[100dvh] w-full bg-zinc-950 font-sans text-zinc-100 selection:bg-pink-500/30 overflow-hidden">
       <Header 
         user={user} 
         onLogout={handleLogout} 
@@ -66,7 +66,7 @@ const App: React.FC = () => {
       />
       
       <main className="flex-1 overflow-hidden relative">
-        <div className="absolute inset-0 p-4 pb-24 md:pb-4 overflow-hidden">
+        <div className="absolute inset-0 p-3 pb-24 md:p-6 md:pb-6 overflow-hidden">
           {renderContent()}
         </div>
       </main>
