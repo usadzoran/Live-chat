@@ -13,6 +13,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
   const [newPostText, setNewPostText] = useState('');
   const [selectedType, setSelectedType] = useState<'text' | 'image' | 'video'>('text');
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   
   // Pull to Refresh & Sync State
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -28,19 +29,34 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
 
   // Real-time Firestore Subscription
   useEffect(() => {
+    let isMounted = true;
     const unsubscribe = db.subscribeToFeed((newPubs) => {
+      if (!isMounted) return;
+      setError(null); // Clear errors if we get data
       setPublications(prev => {
-        // If we are getting new posts while scrolled down, show indicator
         if (newPubs.length > prev.length && prev.length > 0) {
           if (containerRef.current && containerRef.current.scrollTop > 100) {
             setShowNewPostsToast(true);
-            return prev; // Keep old view until they click toast
+            return prev;
           }
         }
         return newPubs;
       });
     });
-    return () => unsubscribe();
+
+    // Check connection state after a delay
+    const timeout = setTimeout(() => {
+      if (publications.length === 0 && isMounted) {
+        // This might be a permission error or slow network
+        console.warn("Feed remains empty. Check Firebase Rules if this persists.");
+      }
+    }, 5000);
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -73,9 +89,9 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
   const triggerRefresh = async () => {
     if (isRefreshing) return;
     setIsRefreshing(true);
+    setError(null);
     
     try {
-      // Fetch latest explicitly or add an AI post for life
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
@@ -99,6 +115,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
       await db.addPublication(newUpdate);
     } catch (error) {
       console.error("Manual refresh sync error", error);
+      setError("Sync failed. Check connection or project rules.");
     } finally {
       setIsRefreshing(false);
     }
@@ -203,11 +220,20 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
             <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter flex items-center gap-3">
               Elite Feed
               <div className="flex gap-1 items-center">
-                 <div className="w-1.5 h-1.5 rounded-full bg-pink-500 animate-pulse"></div>
-                 <span className="text-[8px] text-pink-500 not-italic tracking-widest uppercase">Cloud Sync Active</span>
+                 <div className={`w-1.5 h-1.5 rounded-full ${error ? 'bg-red-500' : 'bg-pink-500 animate-pulse'}`}></div>
+                 <span className={`text-[8px] ${error ? 'text-red-500' : 'text-pink-500'} not-italic tracking-widest uppercase`}>
+                   {error ? 'Sync Error' : 'Cloud Sync Active'}
+                 </span>
               </div>
             </h2>
           </div>
+
+          {error && (
+            <div className="mx-4 p-3 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center gap-3 text-red-400">
+               <i className="fa-solid fa-circle-exclamation text-xs"></i>
+               <p className="text-[10px] font-black uppercase tracking-widest leading-none">{error}</p>
+            </div>
+          )}
 
           <div className="glass-panel p-6 lg:p-8 rounded-[2.5rem] border-white/5 shadow-2xl bg-gradient-to-br from-zinc-900/50 to-transparent">
             <div className="flex gap-4 mb-4">
@@ -268,8 +294,10 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
             ))}
             {publications.length === 0 && (
               <div className="py-20 flex flex-col items-center justify-center opacity-20 text-center space-y-4">
-                 <i className="fa-solid fa-cloud text-5xl"></i>
-                 <p className="text-xs font-black uppercase tracking-widest">Awaiting cloud stream...</p>
+                 <i className={`fa-solid ${error ? 'fa-triangle-exclamation text-red-500' : 'fa-cloud text-pink-500'} text-5xl`}></i>
+                 <p className="text-xs font-black uppercase tracking-widest">
+                   {error ? 'Waiting for database authorization...' : 'Awaiting cloud stream...'}
+                 </p>
               </div>
             )}
           </div>
