@@ -21,12 +21,15 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
   const [paymentMethod, setPaymentMethod] = useState<'visa' | 'paypal' | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [awaitingVerification, setAwaitingVerification] = useState(false);
+  const [awaitingManualVerification, setAwaitingManualVerification] = useState(false);
+
+  // The latest Button ID provided by the user
+  const BUTTON_ID = "QHWLEM9S5DJ2Q";
 
   const handleBuy = (pack: typeof DIAMOND_PACKS[0]) => {
     setSelectedPack(pack);
     setPaymentMethod(null);
-    setAwaitingVerification(false);
+    setAwaitingManualVerification(false);
   };
 
   const confirmVisaPurchase = () => {
@@ -42,21 +45,19 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
     }, 2000);
   };
 
-  const handlePaypalClick = () => {
-    // When using a standard form, we can't detect when the payment is finished programmatically
-    // from this window easily without webhooks. For this UI, we'll show a "Verification" state.
-    setAwaitingVerification(true);
+  const handlePaypalSubmit = () => {
+    setAwaitingManualVerification(true);
   };
 
   const verifyManualPayment = () => {
     if (!selectedPack) return;
     setIsProcessing(true);
-    // Simulate verification of the transaction
+    // Simulate verifying the transaction from the redirect
     setTimeout(() => {
       onPurchase(selectedPack.amount);
       setIsProcessing(false);
       setShowSuccess(true);
-      setAwaitingVerification(false);
+      setAwaitingManualVerification(false);
       setSelectedPack(null);
       setPaymentMethod(null);
       setTimeout(() => setShowSuccess(false), 5000);
@@ -107,9 +108,9 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
                  <i className="fa-solid fa-shield-halved"></i>
               </div>
               <div className="max-w-md">
-                 <h4 className="text-sm font-black text-white uppercase tracking-widest mb-1">Secure Checkout</h4>
+                 <h4 className="text-sm font-black text-white uppercase tracking-widest mb-1">Direct Secure Checkout</h4>
                  <p className="text-[10px] text-zinc-500 leading-relaxed font-bold uppercase tracking-tighter">
-                    Using direct merchant forms to prevent browser security blocks. Transactions are processed on PayPal's secure servers.
+                    We use standard merchant redirect protocols to ensure 100% compatibility. Once you complete the payment on the PayPal site, return here to claim your assets.
                  </p>
               </div>
            </div>
@@ -140,8 +141,7 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
                <span className="text-xl font-black text-white">${selectedPack.price.toFixed(2)}</span>
             </div>
 
-            {/* Provider Selection */}
-            {!awaitingVerification && (
+            {!awaitingManualVerification && (
               <div className="space-y-4">
                 <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest text-left ml-2">Select Provider</p>
                 <div className="grid grid-cols-2 gap-3">
@@ -163,43 +163,44 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
               </div>
             )}
 
-            {/* PayPal Direct Form */}
-            {paymentMethod === 'paypal' && !awaitingVerification && (
+            {/* PayPal Redirect Flow */}
+            {paymentMethod === 'paypal' && !awaitingManualVerification && (
               <div className="space-y-4 animate-in slide-in-from-top-2">
-                <div className="p-8 bg-zinc-900 rounded-[2rem] border border-white/5">
+                <div className="p-8 bg-zinc-900 rounded-[2rem] border border-white/5 flex flex-col items-center">
                    <form 
-                      action="https://www.paypal.com/ncp/payment/8TN879EM3GXUW" 
+                      action={`https://www.paypal.com/ncp/payment/${BUTTON_ID}`} 
                       method="post" 
                       target="_blank" 
-                      className="flex flex-col items-center gap-4"
-                      onSubmit={handlePaypalClick}
+                      className="flex flex-col items-center gap-4 w-full"
+                      onSubmit={handlePaypalSubmit}
                    >
                       <button 
                         type="submit"
-                        className="w-full py-4 bg-[#FFD140] hover:bg-[#f2c63d] text-black font-black text-sm uppercase rounded-xl transition-all active:scale-95 shadow-lg"
+                        className="w-full py-4 bg-[#FFD140] hover:bg-[#f2c63d] text-black font-black text-sm uppercase rounded-xl transition-all active:scale-95 shadow-lg flex items-center justify-center gap-3"
                       >
+                        <i className="fa-brands fa-paypal text-lg"></i>
                         Buy Now with PayPal
                       </button>
                       <img src="https://www.paypalobjects.com/images/Debit_Credit.svg" alt="cards" className="h-6" />
                       <section className="text-[8px] font-bold text-zinc-600 uppercase tracking-widest">
-                        Powered by <img src="https://www.paypalobjects.com/paypal-ui/logos/svg/paypal-wordmark-color.svg" alt="paypal" className="h-3 inline-block align-middle ml-1" />
+                        Redirects to secure PayPal portal
                       </section>
                    </form>
                 </div>
                 <p className="text-[8px] text-zinc-500 uppercase tracking-widest">
-                  Clicking "Buy Now" opens a new secure tab.
+                  Payments are processed on PayPal's secure servers.
                 </p>
               </div>
             )}
 
-            {/* Awaiting Verification State */}
-            {awaitingVerification && (
+            {/* Manual Verification State (Shown after clicking Buy Now) */}
+            {awaitingManualVerification && (
               <div className="space-y-6 animate-in zoom-in duration-300">
-                <div className="p-8 bg-indigo-600/10 border border-indigo-500/20 rounded-[2rem]">
+                <div className="p-8 bg-indigo-600/10 border border-indigo-500/20 rounded-[2.5rem]">
                    <i className="fa-solid fa-hourglass-half text-3xl text-indigo-400 mb-4 animate-pulse"></i>
                    <h4 className="text-sm font-black text-white uppercase tracking-widest mb-2">Awaiting Completion</h4>
                    <p className="text-[10px] text-zinc-400 leading-relaxed uppercase font-bold tracking-tighter">
-                      Once you finish the payment in the new tab, click below to verify and sync your vault.
+                      If the PayPal tab opened, please complete your payment there. Once done, click below to verify and claim your diamonds.
                    </p>
                 </div>
                 <button 
@@ -210,16 +211,16 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
                   {isProcessing ? <i className="fa-solid fa-circle-notch animate-spin"></i> : `VERIFY & CLAIM DIAMONDS`}
                 </button>
                 <button 
-                  onClick={() => setAwaitingVerification(false)}
+                  onClick={() => setAwaitingManualVerification(false)}
                   className="text-[9px] font-black text-zinc-600 uppercase tracking-widest hover:text-white transition-colors"
                 >
-                  Cancel or Choose Another Method
+                  Change Payment Method
                 </button>
               </div>
             )}
 
             {/* Visa Card Flow */}
-            {paymentMethod === 'visa' && !awaitingVerification && (
+            {paymentMethod === 'visa' && !awaitingManualVerification && (
               <div className="space-y-3 animate-in slide-in-from-top-2">
                 <div className="space-y-2 text-left">
                   <input type="text" placeholder="Card Number" className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-xs text-white focus:outline-none focus:border-indigo-500" />
@@ -238,7 +239,7 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
               </div>
             )}
 
-            {!paymentMethod && !awaitingVerification && (
+            {!paymentMethod && !awaitingManualVerification && (
                <div className="py-8 text-zinc-600 italic text-[10px] uppercase tracking-widest">
                  Please select your secure gateway
                </div>
