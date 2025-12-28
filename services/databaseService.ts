@@ -50,12 +50,10 @@ class DatabaseService {
     const saved = localStorage.getItem(DB_NAME);
     if (saved) {
       this.data = JSON.parse(saved);
-      // Ensure migrations for new fields
       if (!this.data.platform.globalPublications) this.data.platform.globalPublications = [];
       if (!this.data.platform.ads) {
         this.data.platform.ads = [
           { id: '1', placement: 'under_header', enabled: true, title: 'Luxury Watches', imageUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=400&q=80', link: '#' },
-          { id: '3', placement: 'under_publication', enabled: true, title: 'Diamond Gifting', imageUrl: 'https://images.unsplash.com/photo-1588444833098-4205565e2482?auto=format&fit=crop&w=400&q=80', link: '#' },
         ];
       }
     } else {
@@ -88,23 +86,9 @@ class DatabaseService {
             clientSecret: "EP_y5ZbwgqdVgJ4GJAx1TTIFiHgn_g47xviitWpoCcX9crWi8uEwVjUqtrdlBDU3aTO6DSEEsUwqHb3b",
             isLive: true
           },
-          globalPublications: [
-            {
-              id: 'init-1',
-              user: 'AlphaStreamer',
-              userAvatar: 'https://ui-avatars.com/api/?name=AlphaStreamer&background=a855f7&color=fff',
-              type: 'image',
-              content: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=800&q=80',
-              description: 'Check out my new gaming setup! 🚀',
-              likes: 124,
-              dislikes: 2,
-              comments: [{ id: 'c1', user: 'TechGuru', text: 'Clean setup, man!', timestamp: new Date() }],
-              timestamp: new Date(Date.now() - 3600000)
-            }
-          ],
+          globalPublications: [],
           ads: [
-            { id: '1', placement: 'under_header', enabled: true, title: 'Luxury Watches', imageUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=400&q=80', link: '#' },
-            { id: '3', placement: 'under_publication', enabled: true, title: 'Diamond Gifting', imageUrl: 'https://images.unsplash.com/photo-1588444833098-4205565e2482?auto=format&fit=crop&w=400&q=80', link: '#' },
+            { id: '1', placement: 'under_header', enabled: true, title: 'Elite Rewards', imageUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=400&q=80', link: '#' },
           ]
         }
       };
@@ -126,26 +110,22 @@ class DatabaseService {
     );
   }
 
+  async deleteUser(email: string): Promise<void> {
+    if (email === 'admin@mydoll.club') return;
+    delete this.data.users[email];
+    this.save();
+  }
+
   async upsertUser(user: UserDB): Promise<UserDB> {
     const isNew = !this.data.users[user.email];
     if (isNew) {
       user.joinedAt = user.joinedAt || new Date().toISOString();
       user.status = user.status || 'active';
       user.role = user.role || (user.gender === 'women' ? 'doll' : 'mentor');
-      
-      if (user.referredBy) {
-        const referrer = this.data.users[user.referredBy];
-        if (referrer) {
-          referrer.diamonds += 500;
-          referrer.referralCount = (referrer.referralCount || 0) + 1;
-        }
-      }
     }
-    
     this.data.users[user.email] = {
       ...this.data.users[user.email],
-      ...user,
-      referralCount: user.referralCount || (this.data.users[user.email]?.referralCount || 0)
+      ...user
     };
     this.save();
     return this.data.users[user.email];
@@ -168,9 +148,19 @@ class DatabaseService {
   }
 
   async updateAdConfig(updatedAd: AdConfig): Promise<void> {
-    this.data.platform.ads = this.data.platform.ads.map(a => 
-      a.id === updatedAd.id ? updatedAd : a
-    );
+    const exists = this.data.platform.ads.find(a => a.id === updatedAd.id);
+    if (exists) {
+      this.data.platform.ads = this.data.platform.ads.map(a => 
+        a.id === updatedAd.id ? updatedAd : a
+      );
+    } else {
+      this.data.platform.ads.push(updatedAd);
+    }
+    this.save();
+  }
+
+  async deleteAd(id: string): Promise<void> {
+    this.data.platform.ads = this.data.platform.ads.filter(a => a.id !== id);
     this.save();
   }
 
@@ -185,6 +175,7 @@ class DatabaseService {
     this.save();
   }
 
+  // Fix: Implemented missing updatePublication method to resolve errors in FeedPage.tsx
   async updatePublication(updatedPub: Publication): Promise<void> {
     this.data.platform.globalPublications = this.data.platform.globalPublications.map(p => 
       p.id === updatedPub.id ? updatedPub : p
@@ -195,7 +186,6 @@ class DatabaseService {
   async getPlatformStats() {
     const users = Object.values(this.data.users);
     const totalDiamondsInSystem = users.reduce((sum, u) => sum + u.diamonds, 0);
-    
     return {
       revenue: this.data.platform.revenue,
       totalPayouts: this.data.platform.totalPayouts,
@@ -212,56 +202,31 @@ class DatabaseService {
     if (this.data.platform.transactions.includes(orderID)) {
       return { success: false, message: "Transaction already processed." };
     }
-
-    try {
-      await new Promise(r => setTimeout(r, 2000));
-      this.data.platform.revenue += price;
-      this.data.platform.transactions.push(orderID);
-
-      const user = this.data.users[userEmail];
-      if (user) {
-        user.diamonds += diamondAmount;
-      }
-
-      this.save();
-      return { 
-        success: true, 
-        message: "Payment captured successfully! Credits added." 
-      };
-    } catch (error) {
-      return { success: false, message: "Error confirming payment." };
-    }
+    this.data.platform.revenue += price;
+    this.data.platform.transactions.push(orderID);
+    const user = this.data.users[userEmail];
+    if (user) user.diamonds += diamondAmount;
+    this.save();
+    return { success: true, message: "Payment captured successfully!" };
   }
 
   async requestWithdrawal(userEmail: string, paypalEmail: string, gemsToConvert: number): Promise<{success: boolean, message: string}> {
     const user = this.data.users[userEmail];
-    if (!user) return { success: false, message: "User not found." };
-    
-    if (user.diamonds < gemsToConvert) {
-      return { success: false, message: "Insufficient diamond balance." };
-    }
-
+    if (!user || user.diamonds < gemsToConvert) return { success: false, message: "Insufficient balance." };
     const amountUsd = gemsToConvert / 100;
-    try {
-      await new Promise(r => setTimeout(r, 1200));
-      user.diamonds -= gemsToConvert;
-      this.data.platform.totalPayouts += amountUsd;
-      
-      const record: WithdrawalRecord = {
-        id: `WTHDRW_${Date.now()}`,
-        amountUsd,
-        gemsConverted: gemsToConvert,
-        paypalEmail,
-        status: 'completed',
-        timestamp: new Date()
-      };
-      
-      user.withdrawals = [record, ...(user.withdrawals || [])];
-      this.save();
-      return { success: true, message: "Withdrawal completed successfully." };
-    } catch (error) {
-      return { success: false, message: "Payout failed." };
-    }
+    user.diamonds -= gemsToConvert;
+    this.data.platform.totalPayouts += amountUsd;
+    const record: WithdrawalRecord = {
+      id: `WTHDRW_${Date.now()}`,
+      amountUsd,
+      gemsConverted: gemsToConvert,
+      paypalEmail,
+      status: 'completed',
+      timestamp: new Date()
+    };
+    user.withdrawals = [record, ...(user.withdrawals || [])];
+    this.save();
+    return { success: true, message: "Withdrawal completed." };
   }
 }
 
