@@ -62,8 +62,8 @@ class DatabaseService {
           'admin@mydoll.club': {
             name: 'Wahab Fresh',
             email: 'admin@mydoll.club',
-            diamonds: 99999,
-            usd_balance: 5420.50,
+            diamonds: 0, // Reset to zero
+            usd_balance: 0, // Reset to zero
             withdrawals: [],
             album: [],
             bio: 'Master Node Administrator',
@@ -78,8 +78,8 @@ class DatabaseService {
           }
         },
         platform: { 
-          revenue: 12450.75, 
-          totalPayouts: 2150.00,
+          revenue: 0, // Reset to zero
+          totalPayouts: 0, // Reset to zero
           transactions: [],
           merchantConfig: {
             clientId: "AchOwxrubWXLdT64U9AmBydM9n7EEgA_psh3nXWi0PPhRvxZRtdHNCpXYxggnKV-dMef3JGMMzdeGvEW",
@@ -98,6 +98,22 @@ class DatabaseService {
 
   private save() {
     localStorage.setItem(DB_NAME, JSON.stringify(this.data));
+  }
+
+  async resetAllWallets(): Promise<void> {
+    // Platform Level
+    this.data.platform.revenue = 0;
+    this.data.platform.totalPayouts = 0;
+    this.data.platform.transactions = [];
+    
+    // User Level
+    Object.keys(this.data.users).forEach(email => {
+      this.data.users[email].diamonds = 0;
+      this.data.users[email].usd_balance = 0;
+      this.data.users[email].withdrawals = [];
+    });
+    
+    this.save();
   }
 
   async getUser(email: string): Promise<UserDB | null> {
@@ -175,7 +191,6 @@ class DatabaseService {
     this.save();
   }
 
-  // Fix: Implemented missing updatePublication method to resolve errors in FeedPage.tsx
   async updatePublication(updatedPub: Publication): Promise<void> {
     this.data.platform.globalPublications = this.data.platform.globalPublications.map(p => 
       p.id === updatedPub.id ? updatedPub : p

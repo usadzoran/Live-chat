@@ -20,6 +20,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ totalRevenue }) => {
   const [editingUser, setEditingUser] = useState<UserDB | null>(null);
   const [showAdModal, setShowAdModal] = useState(false);
   const [editingAd, setEditingAd] = useState<AdConfig | null>(null);
+  
+  // Gem Management Modal
+  const [showGemModal, setShowGemModal] = useState(false);
+  const [gemTargetUser, setGemTargetUser] = useState<UserDB | null>(null);
+  const [gemAdjustment, setGemAdjustment] = useState<number>(0);
 
   const refreshData = async () => {
     setIsLoading(true);
@@ -48,6 +53,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ totalRevenue }) => {
       await db.deleteUser(email);
       refreshData();
     }
+  };
+
+  const handleWalletReset = async () => {
+    if (confirm("NUCLEAR OPTION: Reset all user wallets and platform revenue to ZERO? This cannot be undone.")) {
+      await db.resetAllWallets();
+      refreshData();
+      alert("All wallets have been zeroed and synced to DB.");
+    }
+  };
+
+  const handleAdjustGems = async () => {
+    if (!gemTargetUser) return;
+    const newTotal = Math.max(0, (gemTargetUser.diamonds || 0) + gemAdjustment);
+    await db.upsertUser({
+      ...gemTargetUser,
+      diamonds: newTotal
+    });
+    setShowGemModal(false);
+    setGemAdjustment(0);
+    setGemTargetUser(null);
+    refreshData();
   };
 
   const handleUpsertUser = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -322,6 +348,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ totalRevenue }) => {
                             </td>
                             <td className="p-8">
                                <div className="flex items-center justify-end gap-3">
+                                  <button onClick={() => { setGemTargetUser(u); setShowGemModal(true); }} className="w-10 h-10 rounded-xl bg-cyan-600/10 hover:bg-cyan-600 hover:text-white flex items-center justify-center text-cyan-400 transition-all border border-transparent" title="Manage Gems">
+                                    <i className="fa-solid fa-gem text-[10px]"></i>
+                                  </button>
                                   <button onClick={() => { setEditingUser(u); setShowUserModal(true); }} className="w-10 h-10 rounded-xl bg-white/5 hover:bg-cyan-600/20 hover:text-cyan-400 flex items-center justify-center text-zinc-500 transition-all border border-transparent hover:border-cyan-500/30">
                                     <i className="fa-solid fa-pen text-[10px]"></i>
                                   </button>
@@ -459,6 +488,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ totalRevenue }) => {
                   <h3 className="text-xl font-black uppercase tracking-[0.5em] text-white">Grid System Nominal</h3>
                   <p className="text-[10px] font-bold text-zinc-600 max-w-sm leading-loose uppercase tracking-widest">Global cluster monitoring active. Infrastructure shards operating at 99.99% efficiency. No anomalies detected in AI reasoning chains.</p>
                </div>
+               
+               <div className="flex flex-col gap-4 w-full max-w-xs">
+                  <button 
+                    onClick={handleWalletReset}
+                    className="w-full py-4 bg-red-600/10 border border-red-500/20 text-red-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-xl shadow-red-600/10 active:scale-95"
+                  >
+                    <i className="fa-solid fa-radiation mr-2"></i>
+                    Purge & Reset All Wallets
+                  </button>
+               </div>
+
                <div className="flex gap-4">
                   {[1,2,3,4,5,6,7].map(i => (
                     <div key={i} className="w-2 h-10 bg-cyan-500/10 rounded-full flex items-end overflow-hidden border border-white/5">
@@ -471,7 +511,73 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ totalRevenue }) => {
         </div>
       </main>
 
-      {/* Modals - Same design as before but slightly more polished */}
+      {/* Gem Management Modal */}
+      {showGemModal && gemTargetUser && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/95 backdrop-blur-xl animate-in fade-in duration-300 font-mono">
+           <div className="w-full max-w-md glass-panel p-10 rounded-[3.5rem] border-white/10 shadow-2xl relative overflow-hidden bg-gradient-to-br from-cyan-600/10 to-transparent">
+              <button onClick={() => setShowGemModal(false)} className="absolute top-8 right-8 text-zinc-600 hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
+              
+              <div className="mb-10 text-center">
+                 <div className="w-16 h-16 rounded-2xl bg-cyan-600/20 border border-cyan-500/30 flex items-center justify-center text-3xl text-cyan-400 mx-auto mb-4 shadow-[0_0_20px_rgba(8,145,178,0.3)]">
+                    <i className="fa-solid fa-gem"></i>
+                 </div>
+                 <h2 className="text-2xl font-black text-white uppercase tracking-tighter italic">Manage Gems</h2>
+                 <p className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.2em] mt-1">Adjusting holdings for {gemTargetUser.name}</p>
+              </div>
+
+              <div className="space-y-6">
+                 <div className="p-6 bg-black/40 rounded-2xl border border-white/5 flex flex-col gap-4">
+                    <div className="flex justify-between items-center">
+                       <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Current Balance</span>
+                       <span className="text-lg font-black text-white">{gemTargetUser.diamonds.toLocaleString()} <i className="fa-solid fa-gem text-cyan-400 text-xs ml-1"></i></span>
+                    </div>
+                    <div className="flex justify-between items-center border-t border-white/5 pt-4">
+                       <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Adjustment</span>
+                       <span className={`text-lg font-black ${gemAdjustment >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {gemAdjustment >= 0 ? '+' : ''}{gemAdjustment}
+                       </span>
+                    </div>
+                    <div className="flex justify-between items-center border-t border-white/5 pt-4">
+                       <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">New Balance</span>
+                       <span className="text-2xl font-black text-cyan-400">{Math.max(0, gemTargetUser.diamonds + gemAdjustment).toLocaleString()}</span>
+                    </div>
+                 </div>
+
+                 <div className="space-y-2">
+                    <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Amount to Add/Subtract</label>
+                    <input 
+                       type="number"
+                       value={gemAdjustment}
+                       onChange={(e) => setGemAdjustment(parseInt(e.target.value) || 0)}
+                       className="w-full bg-white/5 border border-white/10 rounded-2xl py-5 px-6 text-xl font-black text-white focus:outline-none focus:border-cyan-500/50 text-center"
+                       placeholder="e.g. 500"
+                    />
+                 </div>
+
+                 <div className="grid grid-cols-3 gap-3">
+                    {[100, 500, 1000].map(amt => (
+                       <button 
+                          key={amt}
+                          onClick={() => setGemAdjustment(amt)}
+                          className="py-3 bg-white/5 border border-white/5 rounded-xl text-[10px] font-black hover:bg-cyan-600 hover:text-white transition-all"
+                       >
+                          +{amt}
+                       </button>
+                    ))}
+                 </div>
+
+                 <button 
+                    onClick={handleAdjustGems}
+                    className="w-full py-5 bg-cyan-600 text-white font-black text-[11px] uppercase tracking-[0.3em] rounded-2xl shadow-2xl shadow-cyan-600/40 active:scale-95 transition-all mt-4"
+                 >
+                    APPLY ADJUSTMENT
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* User CRUD Modal */}
       {showUserModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/95 backdrop-blur-xl animate-in fade-in duration-300">
            <div className="w-full max-w-lg glass-panel p-10 rounded-[3.5rem] border-white/10 shadow-2xl relative overflow-hidden bg-gradient-to-br from-cyan-600/5 to-transparent">
