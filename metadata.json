@@ -1,8 +1,7 @@
 {
-  "name": "Gemini Live Streamer",
-  "description": "A high-performance live streaming platform where users can interact with Gemini AI in real-time using voice and video.",
+  "name": "My doll",
+  "description": "You can find your sugar daddy and sugar mommy with all privat use",
   "requestFramePermissions": [
-    "camera",
     "microphone"
   ]
 }

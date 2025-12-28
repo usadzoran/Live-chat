@@ -1,53 +1,33 @@
 
 import React, { useState } from 'react';
-import { StreamStatus, ViewType } from '../types';
+import { ViewType } from '../types';
 
 interface HeaderProps {
-  status: StreamStatus;
   user: { name: string; email: string } | null;
   onLogout: () => void;
   onNavigate: (view: ViewType) => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ status, user, onLogout, onNavigate }) => {
+const Header: React.FC<HeaderProps> = ({ user, onLogout, onNavigate }) => {
   const [showDropdown, setShowDropdown] = useState(false);
-
-  const getStatusBadge = () => {
-    switch (status) {
-      case StreamStatus.LIVE:
-        return <span className="flex items-center gap-2 px-3 py-1 bg-red-600/20 text-red-500 rounded-full text-xs font-bold animate-pulse"><div className="w-2 h-2 bg-red-500 rounded-full" /> LIVE</span>;
-      case StreamStatus.CONNECTING:
-        return <span className="flex items-center gap-2 px-3 py-1 bg-yellow-600/20 text-yellow-500 rounded-full text-xs font-bold italic">CONNECTING...</span>;
-      case StreamStatus.ERROR:
-        return <span className="flex items-center gap-2 px-3 py-1 bg-zinc-800 text-zinc-400 rounded-full text-xs font-bold">ERROR</span>;
-      default:
-        return <span className="flex items-center gap-2 px-3 py-1 bg-zinc-800 text-zinc-400 rounded-full text-xs font-bold">OFFLINE</span>;
-    }
-  };
 
   return (
     <header className="h-16 flex items-center justify-between px-6 glass-panel border-b border-zinc-800 z-10 relative">
       <div className="flex items-center gap-8">
         <div 
           className="flex items-center gap-3 cursor-pointer group" 
-          onClick={() => onNavigate('stream')}
+          onClick={() => onNavigate('feed')}
         >
           <div className="w-10 h-10 rounded-xl stream-gradient flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:scale-105 transition-transform">
             <i className="fa-solid fa-broadcast-tower text-white text-xl"></i>
           </div>
           <div>
-            <h1 className="text-xl font-bold bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent">GeminiLive</h1>
-            <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold -mt-1">Powered by GenAI</p>
+            <h1 className="text-xl font-bold bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent">GeminiSocial</h1>
+            <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold -mt-1">Connect & Share</p>
           </div>
         </div>
 
         <nav className="hidden md:flex items-center gap-6">
-          <button 
-            onClick={() => onNavigate('stream')}
-            className="text-[10px] font-bold text-zinc-400 hover:text-white uppercase tracking-[0.2em] transition-colors"
-          >
-            Studio
-          </button>
           <button 
             onClick={() => onNavigate('feed')}
             className="text-[10px] font-bold text-zinc-400 hover:text-white uppercase tracking-[0.2em] transition-colors flex items-center gap-2"
@@ -55,11 +35,25 @@ const Header: React.FC<HeaderProps> = ({ status, user, onLogout, onNavigate }) =
             <i className="fa-solid fa-compass"></i>
             Explore Feed
           </button>
+          <button 
+            onClick={() => onNavigate('messages')}
+            className="text-[10px] font-bold text-zinc-400 hover:text-white uppercase tracking-[0.2em] transition-colors flex items-center gap-2"
+          >
+            <i className="fa-solid fa-paper-plane"></i>
+            Messages
+          </button>
         </nav>
       </div>
 
       <div className="flex items-center gap-4">
-        {getStatusBadge()}
+        <button 
+          onClick={() => onNavigate('messages')}
+          className="relative w-10 h-10 rounded-xl bg-white/5 border border-white/5 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/10 transition-all"
+        >
+          <i className="fa-solid fa-bell"></i>
+          <span className="absolute top-2 right-2 w-2 h-2 bg-indigo-500 rounded-full border border-zinc-950"></span>
+        </button>
+
         <div className="h-8 w-[1px] bg-zinc-800 mx-2"></div>
         
         <div className="relative">
@@ -72,7 +66,7 @@ const Header: React.FC<HeaderProps> = ({ status, user, onLogout, onNavigate }) =
             </div>
             <div className="text-left hidden md:block">
               <p className="text-xs font-bold text-white leading-none">{user?.name || 'Anonymous'}</p>
-              <p className="text-[10px] text-zinc-500 leading-none mt-1">Creator</p>
+              <p className="text-[10px] text-zinc-500 leading-none mt-1">Member</p>
             </div>
             <i className={`fa-solid fa-chevron-down text-[10px] text-zinc-600 group-hover:text-zinc-400 transition-transform ${showDropdown ? 'rotate-180' : ''}`}></i>
           </button>
@@ -96,10 +90,7 @@ const Header: React.FC<HeaderProps> = ({ status, user, onLogout, onNavigate }) =
                     <i className="fa-solid fa-user text-zinc-600"></i> Profile
                   </button>
                   <button className="w-full flex items-center gap-3 px-3 py-2 text-xs text-zinc-400 hover:text-white hover:bg-white/5 rounded-xl transition-colors">
-                    <i className="fa-solid fa-chart-line text-zinc-600"></i> Analytics
-                  </button>
-                  <button className="w-full flex items-center gap-3 px-3 py-2 text-xs text-zinc-400 hover:text-white hover:bg-white/5 rounded-xl transition-colors">
-                    <i className="fa-solid fa-gear text-zinc-600"></i> Settings
+                    <i className="fa-solid fa-chart-line text-zinc-600"></i> Statistics
                   </button>
                   <div className="h-[1px] bg-zinc-800 my-1 mx-2"></div>
                   <button 

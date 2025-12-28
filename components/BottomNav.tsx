@@ -10,7 +10,8 @@ interface BottomNavProps {
 const BottomNav: React.FC<BottomNavProps> = ({ activeView, onNavigate }) => {
   const navItems = [
     { id: 'feed', label: 'Explore', icon: 'fa-compass' },
-    { id: 'stream', label: 'Studio', icon: 'fa-broadcast-tower' },
+    { id: 'discovery', label: 'Like Me', icon: 'fa-fire' },
+    { id: 'messages', label: 'Messages', icon: 'fa-paper-plane' },
     { id: 'profile', label: 'Profile', icon: 'fa-user' },
   ] as const;
 

@@ -9,7 +9,6 @@ export interface ConnectionCallbacks {
 }
 
 export class GeminiLiveService {
-  private ai: any;
   private session: any;
   private audioContext: AudioContext | null = null;
   private inputAudioContext: AudioContext | null = null;
@@ -21,9 +20,7 @@ export class GeminiLiveService {
   private micEnabled: boolean = true;
   private camEnabled: boolean = true;
 
-  constructor() {
-    this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  }
+  constructor() {}
 
   setMicEnabled(enabled: boolean) {
     this.micEnabled = enabled;
@@ -34,6 +31,9 @@ export class GeminiLiveService {
   }
 
   async connect(callbacks: ConnectionCallbacks) {
+    // Initialize AI inside connect to ensure freshest API key
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    
     this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
     this.inputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
     
@@ -44,7 +44,7 @@ export class GeminiLiveService {
       throw err;
     }
 
-    const sessionPromise = this.ai.live.connect({
+    const sessionPromise = ai.live.connect({
       model: 'gemini-2.5-flash-native-audio-preview-09-2025',
       callbacks: {
         onopen: () => {
@@ -96,19 +96,20 @@ export class GeminiLiveService {
   private startVideoStreaming(sessionPromise: Promise<any>) {
     if (!this.stream) return;
     
-    const videoTrack = this.stream.getVideoTracks()[0];
-    const imageCapture = new (window as any).ImageCapture(videoTrack);
+    const videoEl = document.createElement('video');
+    videoEl.srcObject = this.stream;
+    videoEl.play();
+
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
 
     this.frameInterval = window.setInterval(async () => {
-      if (!this.camEnabled) return;
+      if (!this.camEnabled || !ctx) return;
 
       try {
-        const frame = await imageCapture.grabFrame();
-        canvas.width = frame.width;
-        canvas.height = frame.height;
-        ctx?.drawImage(frame, 0, 0);
+        canvas.width = videoEl.videoWidth || 640;
+        canvas.height = videoEl.videoHeight || 480;
+        ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
         
         canvas.toBlob(async (blob) => {
           if (blob) {
@@ -123,11 +124,10 @@ export class GeminiLiveService {
       } catch (e) {
         console.error("Frame capture failed", e);
       }
-    }, 1000); // 1 FPS for efficiency
+    }, 1000); // 1 FPS
   }
 
   private async handleServerMessage(message: LiveServerMessage, callbacks: ConnectionCallbacks) {
-    // 1. Handle Transcription
     if (message.serverContent?.inputTranscription) {
       callbacks.onTranscription('user', message.serverContent.inputTranscription.text);
     }
@@ -135,7 +135,6 @@ export class GeminiLiveService {
       callbacks.onTranscription('gemini', message.serverContent.outputTranscription.text);
     }
 
-    // 2. Handle Audio Output
     const audioData = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
     if (audioData && this.audioContext) {
       this.nextStartTime = Math.max(this.nextStartTime, this.audioContext.currentTime);
@@ -151,7 +150,6 @@ export class GeminiLiveService {
       source.onended = () => this.sources.delete(source);
     }
 
-    // 3. Handle Interruption
     if (message.serverContent?.interrupted) {
       this.sources.forEach(s => s.stop());
       this.sources.clear();
@@ -224,7 +222,9 @@ export class GeminiLiveService {
     if (this.stream) {
       this.stream.getTracks().forEach(t => t.stop());
     }
-    this.sources.forEach(s => s.stop());
+    this.sources.forEach(s => {
+      try { s.stop(); } catch(e) {}
+    });
     this.sources.clear();
     this.audioContext?.close();
     this.inputAudioContext?.close();

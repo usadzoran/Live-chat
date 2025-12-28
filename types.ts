@@ -1,4 +1,11 @@
 
+// Enum defining the possible states of a live stream session
+export enum StreamStatus {
+  IDLE = 'IDLE',
+  CONNECTING = 'CONNECTING',
+  LIVE = 'LIVE'
+}
+
 export interface ChatMessage {
   id: string;
   sender: 'user' | 'gemini';
@@ -10,6 +17,27 @@ export interface ChatMessage {
   giftValue?: number;
 }
 
+export interface PrivateMessage {
+  id: string;
+  senderId: string;
+  text?: string;
+  stickerIcon?: string;
+  voiceUrl?: string;
+  voiceDuration?: number;
+  type: 'text' | 'sticker' | 'voice';
+  timestamp: Date;
+}
+
+export interface Conversation {
+  id: string;
+  participantName: string;
+  participantAvatar: string;
+  lastMessage: string;
+  unreadCount: number;
+  isOnline: boolean;
+  messages: PrivateMessage[];
+}
+
 export interface Gift {
   id: string;
   name: string;
@@ -18,14 +46,7 @@ export interface Gift {
   color: string;
 }
 
-export enum StreamStatus {
-  IDLE = 'IDLE',
-  CONNECTING = 'CONNECTING',
-  LIVE = 'LIVE',
-  ERROR = 'ERROR'
-}
-
-export type ViewType = 'stream' | 'profile' | 'feed';
+export type ViewType = 'profile' | 'feed' | 'messages' | 'discovery';
 
 export interface PayoutSettings {
   method: 'paypal' | 'card' | null;

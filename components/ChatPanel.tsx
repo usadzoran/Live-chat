@@ -42,22 +42,16 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ messages, userCoins = 0, onSendGi
     }
   }, [messages]);
 
-  const selectedGift = GIFTS.find(g => g.id === selectedGiftId);
-
   return (
     <div className="flex-1 flex flex-col glass-panel rounded-3xl border border-zinc-800 overflow-hidden relative">
       <div className="p-4 border-b border-zinc-800 bg-zinc-900/50 flex items-center justify-between">
-        <div className="flex flex-col">
-          <h3 className="text-sm font-bold flex items-center gap-2">
-            <i className="fa-solid fa-comments text-indigo-500"></i>
-            LIVE TRANSCRIPTION
-          </h3>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 px-3 py-1 bg-zinc-800 rounded-full border border-white/5">
-             <i className="fa-solid fa-coins text-[10px] text-yellow-500"></i>
-             <span className="text-[10px] font-black text-white">{userCoins.toLocaleString()}</span>
-          </div>
+        <h3 className="text-sm font-bold flex items-center gap-2">
+          <i className="fa-solid fa-comments text-indigo-500"></i>
+          LIVE CHAT
+        </h3>
+        <div className="flex items-center gap-1.5 px-3 py-1 bg-zinc-800 rounded-full border border-white/5">
+           <i className="fa-solid fa-coins text-[10px] text-yellow-500"></i>
+           <span className="text-[10px] font-black text-white">{userCoins.toLocaleString()}</span>
         </div>
       </div>
 
@@ -106,13 +100,13 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ messages, userCoins = 0, onSendGi
         )}
       </div>
 
-      {/* OVERHAULED GIFT PICKER (TIKTOK STYLE) */}
       {showGiftPicker && (
-        <div className="absolute inset-x-0 bottom-0 z-50 animate-in slide-in-from-bottom duration-300 flex flex-col h-2/3 bg-zinc-950/95 backdrop-blur-xl border-t border-white/10 rounded-t-[2rem] shadow-[0_-20px_50px_rgba(0,0,0,0.5)]">
-           {/* Multiplier Bar */}
+        <div className="absolute inset-x-0 bottom-0 z-50 animate-in slide-in-from-bottom duration-300 flex flex-col h-3/4 bg-zinc-950/98 backdrop-blur-2xl border-t border-white/10 rounded-t-[2.5rem] shadow-[0_-20px_60px_rgba(0,0,0,0.8)]">
+           <div className="w-12 h-1.5 bg-zinc-800 rounded-full mx-auto mt-3 mb-1"></div>
+           
            <div className="flex items-center gap-2 p-4 overflow-x-auto hide-scrollbar border-b border-white/5">
               {MULTIPLIERS.map((m) => (
-                <div key={m.label} className="flex-shrink-0 min-w-[70px] aspect-video bg-zinc-900 rounded-xl border border-white/5 p-2 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-800 transition-colors">
+                <div key={m.label} className="flex-shrink-0 min-w-[85px] py-2 bg-zinc-900 rounded-xl border border-white/5 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-800 transition-all active:scale-95">
                    <span className="text-xs font-black text-white">{m.label}</span>
                    <div className="flex items-center gap-1 mt-0.5">
                       <i className="fa-solid fa-coins text-[8px] text-yellow-500"></i>
@@ -125,50 +119,49 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ messages, userCoins = 0, onSendGi
               </div>
            </div>
 
-           {/* Gifts Grid */}
-           <div className="flex-1 overflow-y-auto p-4 grid grid-cols-4 gap-y-6 gap-x-2 hide-scrollbar">
+           <div className="flex-1 overflow-y-auto p-4 grid grid-cols-4 gap-y-8 gap-x-2 hide-scrollbar">
               {GIFTS.map((gift) => (
                 <button 
                   key={gift.id}
                   onClick={() => setSelectedGiftId(gift.id)}
-                  className={`relative flex flex-col items-center group transition-all duration-200 ${selectedGiftId === gift.id ? 'scale-105' : ''}`}
+                  className={`relative flex flex-col items-center group transition-all duration-200 ${selectedGiftId === gift.id ? 'z-10' : ''}`}
                 >
                   <div className={`
-                    w-14 h-14 rounded-2xl flex items-center justify-center text-3xl mb-1.5 transition-all
-                    ${selectedGiftId === gift.id ? 'bg-zinc-800 ring-2 ring-pink-500 shadow-2xl shadow-pink-500/20' : 'hover:bg-white/5'}
+                    w-16 h-16 rounded-2xl flex items-center justify-center text-3xl mb-1.5 transition-all
+                    ${selectedGiftId === gift.id ? 'bg-zinc-800 ring-2 ring-pink-500 shadow-2xl scale-110' : 'hover:bg-white/5'}
                   `}>
-                    <i className={`fa-solid ${gift.icon} ${gift.color}`}></i>
+                    <i className={`fa-solid ${gift.icon} ${gift.color} ${selectedGiftId === gift.id ? 'animate-bounce' : ''}`}></i>
                   </div>
-                  <span className="text-[10px] font-medium text-zinc-300 text-center truncate w-full px-1">{gift.name}</span>
+                  <span className="text-[10px] font-bold text-zinc-300 text-center truncate w-full px-1">{gift.name}</span>
                   <div className="flex items-center gap-1">
                     <i className="fa-solid fa-coins text-[8px] text-yellow-500"></i>
-                    <span className="text-[10px] font-bold text-zinc-500">{gift.cost}</span>
+                    <span className="text-[10px] font-black text-zinc-500">{gift.cost}</span>
                   </div>
 
-                  {/* Individual Send Button for Selected */}
                   {selectedGiftId === gift.id && (
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (onSendGift) onSendGift(gift);
-                        setSelectedGiftId(null);
-                      }}
-                      className="absolute -bottom-8 left-1/2 -translate-x-1/2 z-10 w-full py-1.5 bg-gradient-to-r from-rose-500 to-pink-600 rounded-full text-[10px] font-black text-white uppercase tracking-tighter shadow-xl shadow-pink-600/30 animate-in zoom-in-50 duration-200"
-                    >
-                      Envoyer
-                    </button>
+                    <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 w-[110%] animate-in fade-in zoom-in duration-200">
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onSendGift) onSendGift(gift);
+                          setSelectedGiftId(null);
+                        }}
+                        className="w-full py-2 bg-gradient-to-r from-rose-500 to-pink-600 rounded-full text-[10px] font-black text-white uppercase tracking-tighter shadow-2xl shadow-pink-600/40"
+                      >
+                        Envoyer
+                      </button>
+                    </div>
                   )}
                 </button>
               ))}
            </div>
 
-           {/* Picker Footer */}
-           <div className="p-5 bg-zinc-900/50 border-t border-white/5 flex items-center justify-between">
+           <div className="p-6 bg-zinc-950 border-t border-white/5 flex items-center justify-between">
               <div className="flex items-center gap-4">
-                 <button onClick={() => setShowGiftPicker(false)} className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white transition-colors">
+                 <button className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white transition-all">
                     <i className="fa-solid fa-share-nodes"></i>
                  </button>
-                 <button className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white transition-colors">
+                 <button className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white transition-all">
                     <i className="fa-solid fa-pen"></i>
                  </button>
               </div>
@@ -176,18 +169,17 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ messages, userCoins = 0, onSendGi
               <div className="flex items-center gap-4">
                 <button 
                   onClick={onSupport}
-                  className="flex items-center gap-2 px-4 py-2 bg-zinc-800 rounded-full border border-white/10 group active:scale-95 transition-all"
+                  className="flex items-center gap-3 px-5 py-2.5 bg-zinc-900 rounded-full border border-white/10 hover:border-white/20 active:scale-95 transition-all"
                 >
                   <i className="fa-solid fa-coins text-yellow-500 text-xs"></i>
                   <span className="text-sm font-black text-white">{userCoins.toLocaleString()}</span>
-                  <i className="fa-solid fa-chevron-right text-[8px] text-zinc-500 group-hover:translate-x-1 transition-transform"></i>
+                  <i className="fa-solid fa-chevron-right text-[8px] text-zinc-500"></i>
                 </button>
               </div>
            </div>
         </div>
       )}
 
-      {/* Chat Input Bar */}
       <div className="p-4 bg-zinc-900/80 border-t border-zinc-800 flex items-center gap-3">
         <div className="relative flex-1 group">
            <input 
@@ -196,15 +188,10 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ messages, userCoins = 0, onSendGi
              placeholder="Dis quelque chose..." 
              className="w-full bg-zinc-800/50 border border-zinc-700 rounded-xl px-4 py-3 text-xs text-zinc-300 placeholder:text-zinc-600 focus:outline-none"
            />
-           <div className="absolute right-3 top-1/2 -translate-y-1/2">
-             <div className="w-6 h-6 rounded-full bg-indigo-500/10 flex items-center justify-center">
-               <i className="fa-solid fa-microphone text-[10px] text-indigo-500 animate-pulse"></i>
-             </div>
-           </div>
         </div>
         <button 
           onClick={() => setShowGiftPicker(!showGiftPicker)}
-          className={`shrink-0 w-11 h-11 rounded-xl flex items-center justify-center transition-all shadow-lg ${showGiftPicker ? 'bg-pink-600 text-white shadow-pink-600/20' : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'}`}
+          className={`shrink-0 w-11 h-11 rounded-xl flex items-center justify-center transition-all shadow-lg ${showGiftPicker ? 'bg-pink-600 text-white shadow-pink-600/30 rotate-90' : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'}`}
         >
           <i className="fa-solid fa-gift text-sm"></i>
         </button>
