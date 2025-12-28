@@ -13,6 +13,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ totalRevenue }) => {
   const [allUsers, setAllUsers] = useState<UserDB[]>([]);
   const [ads, setAds] = useState<AdConfig[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // Modals
   const [showUserModal, setShowUserModal] = useState(false);
@@ -90,95 +91,172 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ totalRevenue }) => {
     }
   };
 
+  const navItems = [
+    { id: 'overview', label: 'Command Center', icon: 'fa-chart-pie' },
+    { id: 'users', label: 'User Repository', icon: 'fa-users-gear' },
+    { id: 'treasury', label: 'Platform Wallet', icon: 'fa-vault' },
+    { id: 'ads', label: 'Ad Engine', icon: 'fa-rectangle-ad' },
+    { id: 'nodes', label: 'Infrastructure', icon: 'fa-server' },
+  ] as const;
+
   if (isLoading) {
     return (
       <div className="h-full w-full bg-[#050505] flex items-center justify-center font-mono">
-        <i className="fa-solid fa-circle-notch animate-spin text-cyan-500 text-3xl"></i>
+        <div className="flex flex-col items-center gap-4">
+          <i className="fa-solid fa-circle-notch animate-spin text-cyan-500 text-3xl"></i>
+          <p className="text-[10px] text-cyan-800 uppercase tracking-[0.5em]">Syncing Master Node...</p>
+        </div>
       </div>
     );
   }
 
-  const navItems = [
-    { id: 'overview', label: 'Command Center', icon: 'fa-chart-pie' },
-    { id: 'users', label: 'User Directory', icon: 'fa-users-gear' },
-    { id: 'treasury', label: 'Platform Wallet', icon: 'fa-vault' },
-    { id: 'ads', label: 'Ad Management', icon: 'fa-rectangle-ad' },
-    { id: 'nodes', label: 'Infrastructure', icon: 'fa-server' },
-  ] as const;
-
   return (
-    <div className="h-full w-full bg-[#050505] flex flex-col lg:flex-row overflow-hidden text-zinc-300 font-mono">
-      {/* Sidebar */}
-      <aside className="hidden lg:flex w-64 border-r border-white/5 bg-black/40 flex-col shrink-0">
-        <div className="p-6 border-b border-white/5 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-cyan-600 flex items-center justify-center shadow-[0_0_15px_rgba(8,145,178,0.4)]">
-            <i className="fa-solid fa-shield-halved text-white text-sm"></i>
+    <div className="h-full w-full bg-[#050505] flex flex-col lg:flex-row overflow-hidden text-zinc-300 font-mono selection:bg-cyan-500/30">
+      
+      {/* Navigation Drawer / Sidebar */}
+      <aside className={`
+        fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl lg:relative lg:flex lg:z-0 lg:bg-black/40 lg:w-72 border-r border-white/5 flex-col shrink-0 transition-transform duration-300
+        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `}>
+        <div className="p-8 border-b border-white/5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-cyan-600 flex items-center justify-center shadow-[0_0_20px_rgba(8,145,178,0.4)]">
+              <i className="fa-solid fa-shield-halved text-white text-lg"></i>
+            </div>
+            <div>
+              <h2 className="text-xs font-black text-white uppercase tracking-widest leading-none">Admin Portal</h2>
+              <p className="text-[8px] text-cyan-500 font-bold uppercase tracking-[0.2em] mt-1">Master Access</p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-[10px] font-black text-white uppercase tracking-widest leading-none">Master Node</h2>
-            <p className="text-[8px] text-cyan-500 font-bold uppercase tracking-[0.2em] mt-1">Wahab Fresh Access</p>
-          </div>
+          <button onClick={() => setIsMobileMenuOpen(false)} className="lg:hidden w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-zinc-400">
+            <i className="fa-solid fa-xmark"></i>
+          </button>
         </div>
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto hide-scrollbar">
+
+        <nav className="flex-1 p-6 space-y-3 overflow-y-auto hide-scrollbar">
           {navItems.map(item => (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id as any)}
-              className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === item.id ? 'bg-cyan-600/10 text-cyan-400 border border-cyan-500/20' : 'hover:bg-white/5 text-zinc-500'}`}
+              onClick={() => {
+                setActiveTab(item.id as any);
+                setIsMobileMenuOpen(false);
+              }}
+              className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                activeTab === item.id 
+                  ? 'bg-cyan-600/20 text-cyan-400 border border-cyan-500/30 shadow-[0_0_20px_rgba(8,145,178,0.1)]' 
+                  : 'hover:bg-white/5 text-zinc-500'
+              }`}
             >
-              <i className={`fa-solid ${item.icon} w-4`}></i>
+              <i className={`fa-solid ${item.icon} text-sm w-6`}></i>
               {item.label}
             </button>
           ))}
         </nav>
+
+        <div className="p-6 border-t border-white/5">
+          <div className="bg-white/5 rounded-2xl p-4 border border-white/5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+              <span className="text-[8px] font-black text-zinc-400 uppercase tracking-widest">System Online</span>
+            </div>
+            <p className="text-[7px] text-zinc-600 font-bold leading-relaxed uppercase">Global cluster response at 14ms nominal</p>
+          </div>
+        </div>
       </aside>
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col overflow-hidden relative">
-        <header className="h-14 lg:h-16 border-b border-white/5 px-4 lg:px-8 flex items-center justify-between bg-black/20 backdrop-blur-md shrink-0">
+        
+        {/* Top Header Bar */}
+        <header className="h-20 border-b border-white/5 px-6 lg:px-10 flex items-center justify-between bg-black/20 backdrop-blur-xl shrink-0 z-50">
           <div className="flex items-center gap-4">
-             <span className="text-[10px] text-cyan-500 font-black uppercase tracking-widest">Root / {activeTab}</span>
+            <button onClick={() => setIsMobileMenuOpen(true)} className="lg:hidden w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-zinc-400">
+              <i className="fa-solid fa-bars"></i>
+            </button>
+            <div className="flex flex-col">
+              <span className="text-[10px] text-cyan-500 font-black uppercase tracking-widest leading-none mb-1">Navigation / {activeTab}</span>
+              <h1 className="text-lg font-black text-white uppercase italic tracking-tighter">
+                {navItems.find(n => n.id === activeTab)?.label}
+              </h1>
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-             <div className="flex items-center gap-2">
-                <div className={`w-1.5 h-1.5 rounded-full ${platformStats?.isLive ? 'bg-green-500' : 'bg-amber-500'} shadow-[0_0_8px]`}></div>
-                <span className="text-[8px] font-black uppercase text-zinc-500">{platformStats?.isLive ? 'LIVE' : 'SANDBOX'}</span>
+          
+          <div className="hidden sm:flex items-center gap-6">
+             <div className="flex flex-col items-end">
+                <span className="text-[8px] font-black text-zinc-600 uppercase tracking-[0.3em]">Platform Revenue</span>
+                <span className="text-sm font-black text-emerald-400">${platformStats?.revenue.toFixed(2)}</span>
+             </div>
+             <div className="w-[1px] h-8 bg-white/5"></div>
+             <div className="flex items-center gap-3 px-4 py-2 bg-white/5 border border-white/5 rounded-xl">
+                <i className="fa-solid fa-user-shield text-cyan-500 text-xs"></i>
+                <span className="text-[9px] font-black text-white uppercase tracking-widest">Wahab Fresh</span>
              </div>
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-4 lg:p-8 hide-scrollbar">
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto p-6 lg:p-10 hide-scrollbar bg-[radial-gradient(circle_at_top_right,_rgba(8,145,178,0.05),_transparent_40%)]">
+          
           {activeTab === 'overview' && (
-            <div className="space-y-6 animate-in fade-in duration-500">
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="space-y-8 animate-in fade-in duration-500">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                  {[
-                   { label: 'Platform Revenue', value: `$${platformStats.revenue.toFixed(2)}`, icon: 'fa-dollar-sign', color: 'text-emerald-400' },
-                   { label: 'Total Diamonds', value: platformStats.liabilityUsd * 100, icon: 'fa-gem', color: 'text-cyan-400' },
-                   { label: 'Active Users', value: platformStats.userCount, icon: 'fa-users', color: 'text-pink-400' },
-                   { label: 'Total Payouts', value: `$${platformStats.totalPayouts.toFixed(2)}`, icon: 'fa-money-bill-transfer', color: 'text-indigo-400' },
+                   { label: 'Platform Revenue', value: `$${platformStats.revenue.toFixed(2)}`, icon: 'fa-dollar-sign', color: 'text-emerald-400', bg: 'bg-emerald-500/5' },
+                   { label: 'Diamonds in Circulation', value: (platformStats.liabilityUsd * 100).toLocaleString(), icon: 'fa-gem', color: 'text-cyan-400', bg: 'bg-cyan-500/5' },
+                   { label: 'Total Entities', value: platformStats.userCount, icon: 'fa-users', color: 'text-pink-400', bg: 'bg-pink-500/5' },
+                   { label: 'Total Payouts', value: `$${platformStats.totalPayouts.toFixed(2)}`, icon: 'fa-money-bill-transfer', color: 'text-indigo-400', bg: 'bg-indigo-500/5' },
                  ].map((stat, i) => (
-                  <div key={i} className="p-5 glass-panel rounded-2xl border-white/5 flex flex-col gap-4">
-                    <div className={`w-10 h-10 rounded-xl bg-zinc-900 border border-white/5 flex items-center justify-center ${stat.color}`}>
+                  <div key={i} className={`p-6 glass-panel rounded-3xl border-white/5 flex flex-col gap-6 relative overflow-hidden group ${stat.bg}`}>
+                    <div className={`w-12 h-12 rounded-2xl bg-zinc-950/50 border border-white/5 flex items-center justify-center text-xl ${stat.color} group-hover:scale-110 transition-transform`}>
                       <i className={`fa-solid ${stat.icon}`}></i>
                     </div>
                     <div>
-                      <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest mb-1">{stat.label}</p>
-                      <p className="text-xl font-black text-white">{stat.value}</p>
+                      <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-1">{stat.label}</p>
+                      <p className="text-2xl font-black text-white">{stat.value}</p>
                     </div>
+                    <div className={`absolute top-0 right-0 w-24 h-24 ${stat.color.replace('text', 'bg')}/5 blur-3xl -translate-y-1/2 translate-x-1/2`}></div>
                   </div>
                 ))}
               </div>
               
-              <div className="glass-panel p-6 rounded-3xl border-white/5">
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-6">Quick Infrastructure Status</h3>
-                <div className="space-y-4">
-                   <div className="flex justify-between items-center p-4 bg-white/5 rounded-2xl border border-white/5">
-                      <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Main Cloud Node</span>
-                      <span className="text-[10px] font-black text-emerald-500 uppercase">Optimal [99.9%]</span>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="glass-panel p-8 rounded-[2.5rem] border-white/5 space-y-8">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">Infrastructure Nodes</h3>
+                    <div className="px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20">
+                      <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">Nominal</span>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                     {[
+                       { name: 'Core Database cluster', status: 'Optimal', value: '99.9%', color: 'text-emerald-500' },
+                       { name: 'Real-time Audio Node', status: 'Synced', value: '12ms', color: 'text-cyan-500' },
+                       { name: 'Publication Sychronizer', status: 'Active', value: 'Live', color: 'text-pink-500' },
+                       { name: 'Treasury Wallet Lock', status: 'Secure', value: 'Encypted', color: 'text-indigo-500' },
+                     ].map((node, i) => (
+                       <div key={i} className="flex justify-between items-center p-5 bg-white/5 rounded-2xl border border-white/5 group hover:bg-white/10 transition-all">
+                          <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{node.name}</span>
+                          <div className="text-right">
+                             <p className={`text-[9px] font-black ${node.color} uppercase tracking-widest`}>{node.status}</p>
+                             <p className="text-[8px] text-zinc-600 font-bold uppercase mt-0.5">{node.value}</p>
+                          </div>
+                       </div>
+                     ))}
+                  </div>
+                </div>
+
+                <div className="glass-panel p-8 rounded-[2.5rem] border-white/5 flex flex-col justify-center items-center text-center space-y-6 bg-gradient-to-br from-cyan-600/5 to-transparent">
+                   <div className="w-20 h-20 rounded-3xl bg-zinc-950/50 flex items-center justify-center text-3xl text-cyan-500 border border-white/5 shadow-2xl">
+                      <i className="fa-solid fa-microchip"></i>
                    </div>
-                   <div className="flex justify-between items-center p-4 bg-white/5 rounded-2xl border border-white/5">
-                      <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Gemini Native Audio Cluster</span>
-                      <span className="text-[10px] font-black text-cyan-500 uppercase">Synced [12ms]</span>
+                   <div className="space-y-2">
+                     <h3 className="text-sm font-black text-white uppercase tracking-[0.3em]">AI Reasoning Chain</h3>
+                     <p className="text-[10px] text-zinc-500 font-bold uppercase leading-relaxed max-w-xs mx-auto">Gemini 3 Pro clusters are processing cross-modal data streams for real-time engagement monitoring.</p>
+                   </div>
+                   <div className="flex gap-2">
+                      {[1,2,3,4,5,6,7,8].map(i => (
+                        <div key={i} className="w-1.5 h-6 bg-cyan-500/20 rounded-full animate-pulse" style={{ animationDelay: `${i * 0.1}s` }}></div>
+                      ))}
                    </div>
                 </div>
               </div>
@@ -186,59 +264,73 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ totalRevenue }) => {
           )}
 
           {activeTab === 'users' && (
-            <div className="space-y-6 animate-in fade-in duration-500">
-               <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-black text-white uppercase italic tracking-tighter">User Repository</h2>
+            <div className="space-y-8 animate-in fade-in duration-500">
+               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter">User Repository</h2>
+                    <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Total Entity Count: {allUsers.length}</p>
+                  </div>
                   <button 
                     onClick={() => { setEditingUser(null); setShowUserModal(true); }}
-                    className="px-4 py-2 bg-cyan-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-cyan-600/20 active:scale-95 transition-all"
+                    className="px-8 py-4 bg-cyan-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-2xl shadow-cyan-600/30 active:scale-95 transition-all"
                   >
-                    Add Entity
+                    Inject New Entity
                   </button>
                </div>
 
-               <div className="glass-panel rounded-3xl border-white/5 overflow-hidden">
+               <div className="glass-panel rounded-[2.5rem] border-white/5 overflow-hidden shadow-2xl">
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className="border-b border-white/5 text-[9px] text-zinc-600 uppercase tracking-widest bg-white/[0.02]">
-                          <th className="p-6 font-black">Identity</th>
-                          <th className="p-6 font-black">Holdings (Gems / USD)</th>
-                          <th className="p-6 font-black">Role / Status</th>
-                          <th className="p-6 font-black">Actions</th>
+                          <th className="p-8 font-black">Identity</th>
+                          <th className="p-8 font-black">Holdings</th>
+                          <th className="p-8 font-black">Auth Status</th>
+                          <th className="p-8 font-black text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="text-[10px]">
                         {allUsers.map((u, i) => (
                           <tr key={i} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors group">
-                            <td className="p-6">
-                               <div className="flex items-center gap-3">
-                                  <div className="w-8 h-8 rounded-lg bg-zinc-800 border border-white/5 overflow-hidden">
+                            <td className="p-8">
+                               <div className="flex items-center gap-4">
+                                  <div className="w-12 h-12 rounded-2xl bg-zinc-800 border border-white/5 overflow-hidden">
                                      <img src={u.avatar || `https://ui-avatars.com/api/?name=${u.name}&background=random&color=fff`} className="w-full h-full object-cover" />
                                   </div>
                                   <div>
-                                     <p className="font-black text-white">{u.name}</p>
-                                     <p className="text-[8px] text-zinc-600">{u.email}</p>
+                                     <p className="font-black text-white text-xs">{u.name}</p>
+                                     <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest">{u.email}</p>
                                   </div>
                                </div>
                             </td>
-                            <td className="p-6">
-                               <div className="flex flex-col gap-1">
-                                  <span className="text-cyan-400 font-black flex items-center gap-1.5"><i className="fa-solid fa-gem text-[8px]"></i> {u.diamonds.toLocaleString()}</span>
-                                  <span className="text-emerald-400 font-black">${u.usd_balance.toFixed(2)}</span>
+                            <td className="p-8">
+                               <div className="flex flex-col gap-2">
+                                  <span className="text-cyan-400 font-black flex items-center gap-2 text-xs"><i className="fa-solid fa-gem text-[10px]"></i> {u.diamonds.toLocaleString()}</span>
+                                  <span className="text-emerald-500 font-black tracking-widest">${u.usd_balance.toFixed(2)} USD</span>
                                </div>
                             </td>
-                            <td className="p-6">
-                               <div className="flex flex-col gap-1.5">
-                                  <span className={`px-2 py-0.5 rounded-md text-[7px] font-black uppercase tracking-widest w-fit ${u.role === 'admin' ? 'bg-cyan-500/10 text-cyan-400' : 'bg-pink-500/10 text-pink-400'}`}>{u.role}</span>
-                                  <span className={`text-[7px] font-black uppercase tracking-widest ${u.status === 'banned' ? 'text-red-500' : 'text-emerald-500'}`}>{u.status}</span>
+                            <td className="p-8">
+                               <div className="flex flex-col gap-2">
+                                  <span className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest w-fit ${u.role === 'admin' ? 'bg-cyan-500/10 text-cyan-400' : u.role === 'doll' ? 'bg-pink-500/10 text-pink-400' : 'bg-indigo-500/10 text-indigo-400'}`}>
+                                    {u.role}
+                                  </span>
+                                  <span className={`text-[8px] font-black uppercase tracking-widest flex items-center gap-2 ${u.status === 'banned' ? 'text-red-500' : 'text-emerald-500'}`}>
+                                    <div className={`w-1.5 h-1.5 rounded-full ${u.status === 'banned' ? 'bg-red-500' : 'bg-emerald-500'} animate-pulse`}></div>
+                                    {u.status}
+                                  </span>
                                </div>
                             </td>
-                            <td className="p-6">
-                               <div className="flex items-center gap-2">
-                                  <button onClick={() => { setEditingUser(u); setShowUserModal(true); }} className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-500 hover:text-white transition-all"><i className="fa-solid fa-pen text-[8px]"></i></button>
-                                  <button onClick={() => handleToggleUser(u.email)} className={`w-8 h-8 rounded-lg ${u.status === 'banned' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'} flex items-center justify-center transition-all`}><i className={`fa-solid ${u.status === 'banned' ? 'fa-check' : 'fa-ban'} text-[8px]`}></i></button>
-                                  <button onClick={() => handleDeleteUser(u.email)} disabled={u.role === 'admin'} className="w-8 h-8 rounded-lg bg-white/5 hover:bg-red-600 flex items-center justify-center text-zinc-500 hover:text-white transition-all disabled:opacity-10"><i className="fa-solid fa-trash text-[8px]"></i></button>
+                            <td className="p-8">
+                               <div className="flex items-center justify-end gap-3">
+                                  <button onClick={() => { setEditingUser(u); setShowUserModal(true); }} className="w-10 h-10 rounded-xl bg-white/5 hover:bg-cyan-600/20 hover:text-cyan-400 flex items-center justify-center text-zinc-500 transition-all border border-transparent hover:border-cyan-500/30">
+                                    <i className="fa-solid fa-pen text-[10px]"></i>
+                                  </button>
+                                  <button onClick={() => handleToggleUser(u.email)} className={`w-10 h-10 rounded-xl ${u.status === 'banned' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'} flex items-center justify-center transition-all border border-transparent`}>
+                                    <i className={`fa-solid ${u.status === 'banned' ? 'fa-check' : 'fa-ban'} text-[10px]`}></i>
+                                  </button>
+                                  <button onClick={() => handleDeleteUser(u.email)} disabled={u.role === 'admin'} className="w-10 h-10 rounded-xl bg-white/5 hover:bg-red-600/20 hover:text-red-500 flex items-center justify-center text-zinc-500 transition-all disabled:opacity-5 border border-transparent">
+                                    <i className="fa-solid fa-trash text-[10px]"></i>
+                                  </button>
                                </div>
                             </td>
                           </tr>
@@ -251,42 +343,51 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ totalRevenue }) => {
           )}
 
           {activeTab === 'treasury' && (
-             <div className="space-y-6 animate-in fade-in duration-500">
-                <div className="flex flex-col gap-2 mb-6">
-                   <h2 className="text-xl font-black text-white uppercase italic tracking-tighter">Treasury Management</h2>
-                   <p className="text-[10px] text-zinc-600 font-black uppercase tracking-widest">Platform Liquidity & Settlements</p>
+             <div className="space-y-10 animate-in fade-in duration-500">
+                <div className="flex flex-col gap-2 mb-8">
+                   <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter">Treasury Operations</h2>
+                   <p className="text-[10px] text-zinc-600 font-black uppercase tracking-[0.3em]">Global Platform Liquidity Protocol</p>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                   <div className="glass-panel p-8 rounded-3xl border-white/5 bg-gradient-to-br from-indigo-600/10 to-transparent flex flex-col justify-between">
-                      <div className="space-y-2">
-                        <i className="fa-brands fa-paypal text-3xl text-indigo-400"></i>
-                        <h3 className="text-sm font-black text-white uppercase tracking-widest">Gateway Settlement</h3>
-                        <p className="text-[10px] text-zinc-500 font-black tracking-widest uppercase">Admin Payout Wallet</p>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                   <div className="glass-panel p-10 rounded-[3rem] border-white/5 bg-gradient-to-br from-indigo-600/10 to-transparent flex flex-col justify-between shadow-2xl relative overflow-hidden group">
+                      <div className="space-y-4">
+                        <div className="w-16 h-16 rounded-2xl bg-zinc-950/50 flex items-center justify-center text-4xl text-indigo-400 border border-white/5 shadow-2xl">
+                          <i className="fa-brands fa-paypal"></i>
+                        </div>
+                        <h3 className="text-lg font-black text-white uppercase tracking-widest">Admin Settlement</h3>
+                        <p className="text-[10px] text-zinc-500 font-bold tracking-widest uppercase italic">Master Payout Gateway (Live)</p>
                       </div>
-                      <div className="mt-8 flex justify-between items-end">
+                      <div className="mt-12 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6">
                          <div className="space-y-1">
-                            <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Settled Funds</p>
-                            <p className="text-3xl font-black text-white">${platformStats.revenue.toFixed(2)}</p>
+                            <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.3em]">Total Revenue Capture</p>
+                            <p className="text-5xl font-black text-white tracking-tighter">${platformStats.revenue.toLocaleString()}</p>
                          </div>
-                         <button className="px-6 py-3 bg-indigo-600 text-white text-[9px] font-black uppercase tracking-widest rounded-xl hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-600/20">Withdraw Revenue</button>
+                         <button className="px-10 py-5 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-indigo-500 transition-all shadow-2xl shadow-indigo-600/40 active:scale-95">Withdraw Revenue</button>
                       </div>
+                      <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-600/5 blur-3xl -translate-y-1/2 translate-x-1/2 rounded-full"></div>
                    </div>
 
-                   <div className="glass-panel p-8 rounded-3xl border-white/5 space-y-8">
-                      <h3 className="text-[10px] font-black text-white uppercase tracking-widest">Platform Exposure</h3>
-                      <div className="space-y-4">
-                         <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                            <span className="text-[10px] font-black text-zinc-600 uppercase tracking-widest italic">User Diamond Debt</span>
-                            <span className="text-xl font-black text-cyan-400">${platformStats.liabilityUsd.toFixed(2)}</span>
+                   <div className="glass-panel p-10 rounded-[3rem] border-white/5 space-y-10 bg-gradient-to-br from-pink-600/5 to-transparent shadow-2xl">
+                      <div className="flex items-center justify-between">
+                         <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em]">Platform Liabilities</h3>
+                         <i className="fa-solid fa-vault text-zinc-800 text-xl"></i>
+                      </div>
+                      <div className="space-y-6">
+                         <div className="flex justify-between items-center border-b border-white/5 pb-6">
+                            <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest italic">Member Diamond Liability</span>
+                            <span className="text-2xl font-black text-cyan-400">${platformStats.liabilityUsd.toLocaleString()}</span>
                          </div>
-                         <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                            <span className="text-[10px] font-black text-zinc-600 uppercase tracking-widest italic">Pending Payouts</span>
-                            <span className="text-xl font-black text-pink-400">$0.00</span>
+                         <div className="flex justify-between items-center border-b border-white/5 pb-6">
+                            <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest italic">System Payout Buffer</span>
+                            <span className="text-2xl font-black text-pink-400">$0.00</span>
                          </div>
-                         <div className="flex justify-between items-center pt-2">
-                            <span className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em]">Net Capital Gain</span>
-                            <span className="text-2xl font-black text-white">${(platformStats.revenue - platformStats.totalPayouts).toFixed(2)}</span>
+                         <div className="flex justify-between items-center pt-4">
+                            <span className="text-[11px] font-black text-emerald-400 uppercase tracking-[0.3em]">Net Operational Surplus</span>
+                            <div className="text-right">
+                               <p className="text-4xl font-black text-white tracking-tighter">${(platformStats.revenue - platformStats.totalPayouts).toLocaleString()}</p>
+                               <p className="text-[8px] text-zinc-600 font-bold uppercase tracking-widest mt-1">Ready for settlement</p>
+                            </div>
                          </div>
                       </div>
                    </div>
@@ -295,40 +396,51 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ totalRevenue }) => {
           )}
 
           {activeTab === 'ads' && (
-            <div className="space-y-6 animate-in fade-in duration-500">
-               <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-black text-white uppercase italic tracking-tighter">Ad Traffic Engine</h2>
+            <div className="space-y-8 animate-in fade-in duration-500">
+               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter">Traffic Control Engine</h2>
+                    <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Active Ad Slots: {ads.length}</p>
+                  </div>
                   <button 
                     onClick={() => { setEditingAd(null); setShowAdModal(true); }}
-                    className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-600/20 active:scale-95 transition-all"
+                    className="px-8 py-4 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-2xl shadow-emerald-600/30 active:scale-95 transition-all"
                   >
-                    Create Ad Slot
+                    Provision New Ad Slot
                   </button>
                </div>
 
-               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                   {ads.map(ad => (
-                    <div key={ad.id} className="glass-panel p-6 rounded-3xl border-white/5 flex flex-col gap-6 relative group overflow-hidden">
+                    <div key={ad.id} className="glass-panel p-8 rounded-[3rem] border-white/5 flex flex-col gap-8 relative group overflow-hidden bg-black/40 hover:bg-black/60 transition-all shadow-2xl">
                        <div className="flex items-center justify-between z-10">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl ${ad.enabled ? 'bg-cyan-600/20 text-cyan-400' : 'bg-zinc-800 text-zinc-600'}`}>
+                          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl ${ad.enabled ? 'bg-cyan-600/20 text-cyan-400 border border-cyan-500/20' : 'bg-zinc-900 text-zinc-600 border border-white/5'}`}>
                              <i className="fa-solid fa-rectangle-ad"></i>
                           </div>
-                          <div className="flex gap-2">
-                             <button onClick={() => { setEditingAd(ad); setShowAdModal(true); }} className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-500 hover:text-white transition-all"><i className="fa-solid fa-pen text-[8px]"></i></button>
-                             <button onClick={() => handleDeleteAd(ad.id)} className="w-8 h-8 rounded-lg bg-white/5 hover:bg-red-600 flex items-center justify-center text-zinc-500 hover:text-white transition-all"><i className="fa-solid fa-trash text-[8px]"></i></button>
+                          <div className="flex gap-3">
+                             <button onClick={() => { setEditingAd(ad); setShowAdModal(true); }} className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-500 hover:text-white transition-all"><i className="fa-solid fa-pen text-[10px]"></i></button>
+                             <button onClick={() => handleDeleteAd(ad.id)} className="w-10 h-10 rounded-xl bg-white/5 hover:bg-red-600 flex items-center justify-center text-zinc-500 hover:text-white transition-all"><i className="fa-solid fa-trash text-[10px]"></i></button>
                           </div>
                        </div>
                        
                        <div className="z-10">
-                          <h4 className="text-[11px] font-black text-white uppercase tracking-widest mb-1">{ad.title}</h4>
-                          <p className="text-[8px] text-zinc-500 uppercase tracking-widest font-bold">Placement: {ad.placement}</p>
+                          <h4 className="text-sm font-black text-white uppercase tracking-widest mb-2 truncate">{ad.title}</h4>
+                          <div className="flex items-center gap-3">
+                            <span className="text-[8px] text-zinc-500 uppercase tracking-widest font-black px-2 py-1 bg-white/5 rounded-md border border-white/5">Slot: {ad.placement.replace('_', ' ')}</span>
+                            <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${ad.enabled ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>{ad.enabled ? 'Live' : 'Paused'}</span>
+                          </div>
                        </div>
 
-                       <div className="aspect-video rounded-xl overflow-hidden border border-white/5 bg-zinc-950/50 z-10">
-                          <img src={ad.imageUrl} className="w-full h-full object-cover opacity-60 hover:opacity-100 transition-opacity" />
+                       <div className="aspect-video rounded-2xl overflow-hidden border border-white/5 bg-zinc-950/80 z-10 shadow-inner group-hover:scale-[1.02] transition-transform duration-500">
+                          <img src={ad.imageUrl} className="w-full h-full object-cover opacity-40 group-hover:opacity-80 transition-opacity" alt="preview" />
+                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                             <div className="px-4 py-2 bg-black/60 backdrop-blur-md rounded-lg border border-white/10">
+                                <span className="text-[8px] font-black text-white uppercase tracking-[0.2em]">View Visual Asset</span>
+                             </div>
+                          </div>
                        </div>
 
-                       <div className={`absolute top-0 right-0 w-16 h-16 ${ad.enabled ? 'bg-cyan-500/10' : 'bg-red-500/10'} blur-3xl rounded-full -translate-y-1/2 translate-x-1/2`}></div>
+                       <div className={`absolute top-0 right-0 w-32 h-32 ${ad.enabled ? 'bg-cyan-500/10' : 'bg-red-500/10'} blur-[60px] rounded-full -translate-y-1/2 translate-x-1/2 transition-colors`}></div>
                     </div>
                   ))}
                </div>
@@ -336,106 +448,134 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ totalRevenue }) => {
           )}
 
           {activeTab === 'nodes' && (
-            <div className="h-full flex flex-col items-center justify-center opacity-30 text-center space-y-4">
-               <i className="fa-solid fa-microchip text-4xl mb-2"></i>
-               <h3 className="text-xs font-black uppercase tracking-[0.5em]">Network Subsystem Online</h3>
-               <p className="text-[10px] font-bold max-w-xs leading-loose">Visual synthesis clusters are operating at nominal capacity. No errors detected in the AI reasoning chain.</p>
+            <div className="h-full flex flex-col items-center justify-center text-center space-y-8 animate-in zoom-in duration-500">
+               <div className="relative">
+                  <div className="absolute inset-0 bg-cyan-600/20 blur-[80px] rounded-full animate-pulse"></div>
+                  <div className="w-32 h-32 rounded-[3rem] bg-zinc-950 border-4 border-cyan-500/30 flex items-center justify-center text-5xl text-cyan-500 relative z-10 shadow-2xl">
+                    <i className="fa-solid fa-microchip"></i>
+                  </div>
+               </div>
+               <div className="space-y-3">
+                  <h3 className="text-xl font-black uppercase tracking-[0.5em] text-white">Grid System Nominal</h3>
+                  <p className="text-[10px] font-bold text-zinc-600 max-w-sm leading-loose uppercase tracking-widest">Global cluster monitoring active. Infrastructure shards operating at 99.99% efficiency. No anomalies detected in AI reasoning chains.</p>
+               </div>
+               <div className="flex gap-4">
+                  {[1,2,3,4,5,6,7].map(i => (
+                    <div key={i} className="w-2 h-10 bg-cyan-500/10 rounded-full flex items-end overflow-hidden border border-white/5">
+                      <div className="w-full bg-cyan-500 animate-[move-gradient_2s_ease_infinite]" style={{ height: `${Math.random() * 80 + 20}%`, animationDelay: `${i * 0.2}s` }}></div>
+                    </div>
+                  ))}
+               </div>
             </div>
           )}
         </div>
       </main>
 
-      {/* User CRUD Modal */}
+      {/* Modals - Same design as before but slightly more polished */}
       {showUserModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm animate-in fade-in duration-300">
-           <div className="w-full max-w-md glass-panel p-8 rounded-[3rem] border-white/10 shadow-2xl relative overflow-hidden">
-              <button onClick={() => setShowUserModal(false)} className="absolute top-6 right-6 text-zinc-600 hover:text-white"><i className="fa-solid fa-xmark text-lg"></i></button>
-              <div className="mb-8">
-                 <h2 className="text-xl font-black text-white uppercase tracking-tighter italic">{editingUser ? 'Modify Entity' : 'Inject New Entity'}</h2>
-                 <p className="text-[8px] text-zinc-500 font-black uppercase tracking-widest mt-1">Direct Database Write Privilege</p>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/95 backdrop-blur-xl animate-in fade-in duration-300">
+           <div className="w-full max-w-lg glass-panel p-10 rounded-[3.5rem] border-white/10 shadow-2xl relative overflow-hidden bg-gradient-to-br from-cyan-600/5 to-transparent">
+              <button onClick={() => setShowUserModal(false)} className="absolute top-8 right-8 text-zinc-600 hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
+              <div className="mb-10 text-center sm:text-left">
+                 <h2 className="text-3xl font-black text-white uppercase tracking-tighter italic">{editingUser ? 'Modify Entity' : 'Inject Entity'}</h2>
+                 <p className="text-[9px] text-zinc-500 font-black uppercase tracking-[0.2em] mt-1">Direct Master-Database Access Protocol</p>
               </div>
 
-              <form onSubmit={handleUpsertUser} className="space-y-5">
-                 <div className="space-y-1.5">
-                    <label className="text-[9px] font-black text-zinc-600 uppercase tracking-widest ml-1">Identity Name</label>
-                    <input name="name" defaultValue={editingUser?.name || ''} required className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-5 text-xs text-white focus:outline-none focus:border-cyan-500/50" />
+              <form onSubmit={handleUpsertUser} className="space-y-6">
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                   <div className="space-y-2">
+                      <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Identity Display</label>
+                      <input name="name" defaultValue={editingUser?.name || ''} required className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-xs text-white focus:outline-none focus:border-cyan-500/50 transition-all" />
+                   </div>
+                   <div className="space-y-2">
+                      <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Master Email</label>
+                      <input name="email" readOnly={!!editingUser} defaultValue={editingUser?.email || ''} required className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-xs text-white focus:outline-none focus:border-cyan-500/50 disabled:opacity-30 disabled:cursor-not-allowed" />
+                   </div>
                  </div>
-                 <div className="space-y-1.5">
-                    <label className="text-[9px] font-black text-zinc-600 uppercase tracking-widest ml-1">Master Email (UID)</label>
-                    <input name="email" readOnly={!!editingUser} defaultValue={editingUser?.email || ''} required className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-5 text-xs text-white focus:outline-none focus:border-cyan-500/50 disabled:opacity-30" />
-                 </div>
-                 <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                        <label className="text-[9px] font-black text-zinc-600 uppercase tracking-widest ml-1">Diamonds</label>
-                        <input name="diamonds" type="number" defaultValue={editingUser?.diamonds || 0} className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-5 text-xs text-white focus:outline-none focus:border-cyan-500/50" />
+
+                 <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Diamond Load</label>
+                        <input name="diamonds" type="number" defaultValue={editingUser?.diamonds || 0} className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-xs text-white focus:outline-none focus:border-cyan-500/50 transition-all" />
                     </div>
-                    <div className="space-y-1.5">
-                        <label className="text-[9px] font-black text-zinc-600 uppercase tracking-widest ml-1">Cash Balance ($)</label>
-                        <input name="usd_balance" type="number" step="0.01" defaultValue={editingUser?.usd_balance || 0} className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-5 text-xs text-white focus:outline-none focus:border-cyan-500/50" />
-                    </div>
-                 </div>
-                 <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                        <label className="text-[9px] font-black text-zinc-600 uppercase tracking-widest ml-1">Security Role</label>
-                        <select name="role" defaultValue={editingUser?.role || 'doll'} className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-5 text-xs text-white focus:outline-none focus:border-cyan-500/50 appearance-none">
-                           <option value="doll">Doll</option>
-                           <option value="mentor">Mentor</option>
-                           <option value="admin">Admin</option>
-                        </select>
-                    </div>
-                    <div className="space-y-1.5">
-                        <label className="text-[9px] font-black text-zinc-600 uppercase tracking-widest ml-1">Node Status</label>
-                        <select name="status" defaultValue={editingUser?.status || 'active'} className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-5 text-xs text-white focus:outline-none focus:border-cyan-500/50 appearance-none">
-                           <option value="active">Active</option>
-                           <option value="banned">Banned</option>
-                        </select>
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Cash Balance ($)</label>
+                        <input name="usd_balance" type="number" step="0.01" defaultValue={editingUser?.usd_balance || 0} className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-xs text-white focus:outline-none focus:border-cyan-500/50 transition-all" />
                     </div>
                  </div>
-                 <button type="submit" className="w-full py-4 bg-cyan-600 text-white font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-xl shadow-cyan-600/20 active:scale-95 transition-all mt-4">COMMIT TRANSACTION</button>
+
+                 <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">System Role</label>
+                        <div className="relative">
+                          <select name="role" defaultValue={editingUser?.role || 'doll'} className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-xs text-white focus:outline-none focus:border-cyan-500/50 appearance-none cursor-pointer">
+                             <option value="doll">Doll Entity</option>
+                             <option value="mentor">Mentor Entity</option>
+                             <option value="admin">System Master</option>
+                          </select>
+                          <i className="fa-solid fa-chevron-down absolute right-6 top-1/2 -translate-y-1/2 text-zinc-600 pointer-events-none"></i>
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Node Status</label>
+                        <div className="relative">
+                          <select name="status" defaultValue={editingUser?.status || 'active'} className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-xs text-white focus:outline-none focus:border-cyan-500/50 appearance-none cursor-pointer">
+                             <option value="active">Operational</option>
+                             <option value="banned">Quarantined</option>
+                          </select>
+                          <i className="fa-solid fa-chevron-down absolute right-6 top-1/2 -translate-y-1/2 text-zinc-600 pointer-events-none"></i>
+                        </div>
+                    </div>
+                 </div>
+                 <button type="submit" className="w-full py-5 bg-cyan-600 text-white font-black text-[11px] uppercase tracking-[0.3em] rounded-2xl shadow-2xl shadow-cyan-600/40 active:scale-95 transition-all mt-6">COMMIT TRANSACTION</button>
               </form>
            </div>
         </div>
       )}
 
-      {/* Ad CRUD Modal */}
       {showAdModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm animate-in fade-in duration-300">
-           <div className="w-full max-w-md glass-panel p-8 rounded-[3rem] border-white/10 shadow-2xl relative overflow-hidden">
-              <button onClick={() => setShowAdModal(false)} className="absolute top-6 right-6 text-zinc-600 hover:text-white"><i className="fa-solid fa-xmark text-lg"></i></button>
-              <div className="mb-8">
-                 <h2 className="text-xl font-black text-white uppercase tracking-tighter italic">{editingAd ? 'Modify Ad Logic' : 'Provision New Ad'}</h2>
-                 <p className="text-[8px] text-zinc-500 font-black uppercase tracking-widest mt-1">Traffic Subsystem Config</p>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/95 backdrop-blur-xl animate-in fade-in duration-300">
+           <div className="w-full max-w-lg glass-panel p-10 rounded-[3.5rem] border-white/10 shadow-2xl relative overflow-hidden bg-gradient-to-br from-emerald-600/5 to-transparent">
+              <button onClick={() => setShowAdModal(false)} className="absolute top-8 right-8 text-zinc-600 hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
+              <div className="mb-10 text-center sm:text-left">
+                 <h2 className="text-3xl font-black text-white uppercase tracking-tighter italic">{editingAd ? 'Modify Ad Logic' : 'Provision Ad Slot'}</h2>
+                 <p className="text-[9px] text-zinc-500 font-black uppercase tracking-[0.2em] mt-1">Traffic Subsystem Dynamic Config</p>
               </div>
 
-              <form onSubmit={handleUpsertAd} className="space-y-5">
-                 <div className="space-y-1.5">
-                    <label className="text-[9px] font-black text-zinc-600 uppercase tracking-widest ml-1">Internal Ad Title</label>
-                    <input name="title" defaultValue={editingAd?.title || ''} required className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-5 text-xs text-white focus:outline-none focus:border-emerald-500/50" />
+              <form onSubmit={handleUpsertAd} className="space-y-6">
+                 <div className="space-y-2">
+                    <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Internal Title Reference</label>
+                    <input name="title" defaultValue={editingAd?.title || ''} required className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-xs text-white focus:outline-none focus:border-emerald-500/50 transition-all" />
                  </div>
-                 <div className="space-y-1.5">
-                    <label className="text-[9px] font-black text-zinc-600 uppercase tracking-widest ml-1">Media URL (Image)</label>
-                    <input name="imageUrl" defaultValue={editingAd?.imageUrl || ''} placeholder="https://..." required className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-5 text-xs text-white focus:outline-none focus:border-emerald-500/50" />
+                 <div className="space-y-2">
+                    <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Media Asset Endpoint (URL)</label>
+                    <input name="imageUrl" defaultValue={editingAd?.imageUrl || ''} placeholder="https://cloud.assets.com/..." required className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-xs text-white focus:outline-none focus:border-emerald-500/50 transition-all" />
                  </div>
-                 <div className="space-y-1.5">
-                    <label className="text-[9px] font-black text-zinc-600 uppercase tracking-widest ml-1">HTML Redirection Link / Logic</label>
-                    <textarea name="link" defaultValue={editingAd?.link || ''} required className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-5 text-[10px] text-emerald-400 font-mono focus:outline-none focus:border-emerald-500/50 h-24 resize-none" />
+                 <div className="space-y-2">
+                    <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Redirection Payload / HTML Logic</label>
+                    <textarea name="link" defaultValue={editingAd?.link || ''} required className="w-full bg-white/5 border border-white/10 rounded-2xl py-5 px-6 text-[11px] text-emerald-400 font-mono focus:outline-none focus:border-emerald-500/50 h-32 resize-none shadow-inner leading-relaxed" placeholder="<div onclick='redirect(...)'>...</div>" />
                  </div>
-                 <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                        <label className="text-[9px] font-black text-zinc-600 uppercase tracking-widest ml-1">Deployment Slot</label>
-                        <select name="placement" defaultValue={editingAd?.placement || 'under_header'} className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-5 text-xs text-white focus:outline-none focus:border-emerald-500/50 appearance-none">
-                           <option value="under_header">Header Banner</option>
-                           <option value="before_publication">Pre-Feed Slot</option>
-                           <option value="under_publication">Post-Feed Slot</option>
-                           <option value="footer">Footer Global</option>
-                        </select>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 items-center">
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Deployment Target</label>
+                        <div className="relative">
+                          <select name="placement" defaultValue={editingAd?.placement || 'under_header'} className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-xs text-white focus:outline-none focus:border-emerald-500/50 appearance-none cursor-pointer">
+                             <option value="under_header">Header Banner</option>
+                             <option value="before_publication">Pre-Feed Inset</option>
+                             <option value="under_publication">Post-Feed Inset</option>
+                             <option value="footer">Global Footer</option>
+                          </select>
+                          <i className="fa-solid fa-chevron-down absolute right-6 top-1/2 -translate-y-1/2 text-zinc-600 pointer-events-none"></i>
+                        </div>
                     </div>
-                    <div className="flex items-center gap-3 pt-6 px-4">
-                       <input type="checkbox" name="enabled" defaultChecked={editingAd?.enabled ?? true} className="w-4 h-4 accent-emerald-500" />
-                       <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Live Status</label>
+                    <div className="flex items-center gap-4 pt-6 px-4">
+                       <div className="relative inline-flex items-center cursor-pointer">
+                         <input type="checkbox" name="enabled" defaultChecked={editingAd?.enabled ?? true} className="w-5 h-5 accent-emerald-500 rounded border-white/10" />
+                       </div>
+                       <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Active Status</label>
                     </div>
                  </div>
-                 <button type="submit" className="w-full py-4 bg-emerald-600 text-white font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-xl shadow-emerald-600/20 active:scale-95 transition-all mt-4">SYNC AD ENGINE</button>
+                 <button type="submit" className="w-full py-5 bg-emerald-600 text-white font-black text-[11px] uppercase tracking-[0.3em] rounded-2xl shadow-2xl shadow-emerald-600/40 active:scale-95 transition-all mt-6">SYNC TRAFFIC ENGINE</button>
               </form>
            </div>
         </div>
