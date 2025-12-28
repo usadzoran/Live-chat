@@ -4,17 +4,16 @@ import Header from './components/Header';
 import AuthPage from './components/AuthPage';
 import ProfileView from './components/ProfileView';
 import LandingPage from './components/LandingPage';
-import PaymentModal from './components/PaymentModal';
 import FeedPage from './components/FeedPage';
 import MessagesView from './components/MessagesView';
 import DiscoveryView from './components/DiscoveryView';
+import LiveBroadcasterView from './components/LiveBroadcasterView';
 import BottomNav from './components/BottomNav';
 import { ViewType } from './types';
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
-  const [showPayment, setShowPayment] = useState(false);
   const [user, setUser] = useState<{ name: string; email: string; bio?: string } | null>(null);
   const [currentView, setCurrentView] = useState<ViewType>('feed');
 
@@ -44,61 +43,38 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (currentView) {
       case 'profile':
-        return (
-          <div className="h-full animate-in fade-in slide-in-from-right-8 duration-500">
-            <ProfileView 
-              user={user!} 
-              onUpdate={handleUpdateUser} 
-              onBack={() => setCurrentView('feed')} 
-            />
-          </div>
-        );
+        return <ProfileView user={user!} onUpdate={handleUpdateUser} onBack={() => setCurrentView('feed')} />;
       case 'feed':
-        return (
-          <div className="h-full animate-in fade-in slide-in-from-left-8 duration-500">
-            <FeedPage user={user!} />
-          </div>
-        );
+        return <FeedPage user={user!} />;
       case 'messages':
-        return (
-          <div className="h-full animate-in fade-in slide-in-from-bottom-8 duration-500">
-            <MessagesView currentUser={user!} />
-          </div>
-        );
+        return <MessagesView currentUser={user!} />;
       case 'discovery':
-        return (
-          <div className="h-full animate-in fade-in zoom-in duration-500">
-            <DiscoveryView />
-          </div>
-        );
+        return <DiscoveryView />;
+      case 'live':
+        return <LiveBroadcasterView />;
       default:
-        return null;
+        return <FeedPage user={user!} />;
     }
   };
 
   return (
-    <div className="flex flex-col h-screen w-full bg-zinc-950 font-sans">
+    <div className="flex flex-col h-screen w-full bg-zinc-950 font-sans text-zinc-100 selection:bg-indigo-500/30">
       <Header 
         user={user} 
         onLogout={handleLogout} 
         onNavigate={setCurrentView} 
       />
       
-      <main className="flex-1 overflow-hidden p-4 pb-24">
-        {renderContent()}
+      <main className="flex-1 overflow-hidden relative">
+        <div className="absolute inset-0 p-4 pb-24 md:pb-4 overflow-hidden">
+          {renderContent()}
+        </div>
       </main>
 
       <BottomNav 
         activeView={currentView} 
         onNavigate={setCurrentView} 
       />
-
-      {showPayment && (
-        <PaymentModal 
-          streamerName={user?.name || "the creator"} 
-          onClose={() => setShowPayment(false)} 
-        />
-      )}
     </div>
   );
 };

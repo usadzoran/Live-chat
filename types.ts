@@ -1,5 +1,4 @@
 
-// Enum defining the possible states of a live stream session
 export enum StreamStatus {
   IDLE = 'IDLE',
   CONNECTING = 'CONNECTING',
@@ -46,7 +45,7 @@ export interface Gift {
   color: string;
 }
 
-export type ViewType = 'profile' | 'feed' | 'messages' | 'discovery';
+export type ViewType = 'profile' | 'feed' | 'messages' | 'discovery' | 'live';
 
 export interface PayoutSettings {
   method: 'paypal' | 'card' | null;
@@ -68,7 +67,7 @@ export interface Publication {
   user: string;
   userAvatar: string;
   type: 'text' | 'image' | 'video';
-  content: string; // text or url
+  content: string;
   description?: string;
   likes: number;
   dislikes: number;

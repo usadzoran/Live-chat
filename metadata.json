@@ -1,7 +1,9 @@
 {
   "name": "My doll",
-  "description": "You can find your sugar daddy and sugar mommy with all privat use",
+  "description": "A high-performance live streaming and social discovery platform.",
   "requestFramePermissions": [
-    "microphone"
+    "camera",
+    "microphone",
+    "geolocation"
   ]
 }
