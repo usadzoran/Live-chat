@@ -1,16 +1,15 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Publication, Comment, AdConfig } from '../types';
+import { GoogleGenAI } from '@google/genai';
 
 interface FeedPageProps {
   user: { name: string; avatar?: string };
 }
 
 const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
-  // Simulating Ad configuration that would come from global state/backend
   const [adConfig] = useState<AdConfig[]>([
     { id: '1', placement: 'under_header', enabled: true, title: 'Luxury Watches', imageUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=400&q=80', link: '#' },
-    { id: '2', placement: 'before_publication', enabled: true, title: 'Elite Membership', imageUrl: '', link: '#' },
     { id: '3', placement: 'under_publication', enabled: true, title: 'Diamond Gifting', imageUrl: 'https://images.unsplash.com/photo-1588444833098-4205565e2482?auto=format&fit=crop&w=400&q=80', link: '#' },
   ]);
 
@@ -44,6 +43,81 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
 
   const [newPostText, setNewPostText] = useState('');
   const [selectedType, setSelectedType] = useState<'text' | 'image' | 'video'>('text');
+  
+  // Refresh State
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const startY = useRef(0);
+  const isPulling = useRef(false);
+
+  const PULL_THRESHOLD = 80;
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (containerRef.current?.scrollTop === 0) {
+      startY.current = e.touches[0].pageY;
+      isPulling.current = true;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isPulling.current) return;
+    const currentY = e.touches[0].pageY;
+    const diff = currentY - startY.current;
+    if (diff > 0) {
+      // Rubber banding effect
+      const dampedDiff = Math.pow(diff, 0.8);
+      setPullDistance(dampedDiff);
+      if (dampedDiff > 5) {
+        e.preventDefault();
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (pullDistance > PULL_THRESHOLD) {
+      triggerRefresh();
+    }
+    isPulling.current = false;
+    setPullDistance(0);
+  };
+
+  const triggerRefresh = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: 'Generate a short, luxury-themed social media post for an elite social club called My Doll. Include a username (one word), a witty or high-end text content, and suggest a type (image or text). Return as JSON: { "username": "", "content": "", "type": "text" | "image" }',
+        config: { responseMimeType: 'application/json' }
+      });
+
+      const data = JSON.parse(response.text || '{}');
+      
+      const newUpdate: Publication = {
+        id: Math.random().toString(36).substr(2, 9),
+        user: data.username || 'EliteMember',
+        userAvatar: `https://ui-avatars.com/api/?name=${data.username || 'User'}&background=random&color=fff`,
+        type: data.type || 'text',
+        content: data.type === 'image' 
+          ? 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80' 
+          : data.content,
+        description: data.type === 'image' ? data.content : undefined,
+        likes: Math.floor(Math.random() * 50),
+        dislikes: 0,
+        comments: [],
+        timestamp: new Date()
+      };
+
+      setPublications(prev => [newUpdate, ...prev]);
+    } catch (error) {
+      console.error("Failed to fetch real-time updates:", error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const handlePost = () => {
     if (!newPostText.trim()) return;
@@ -124,7 +198,29 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
   };
 
   return (
-    <div className="max-w-3xl mx-auto h-full flex flex-col gap-4 lg:gap-8 overflow-y-auto pb-24 lg:pb-32 hide-scrollbar px-2">
+    <div 
+      ref={containerRef}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      className="max-w-3xl mx-auto h-full flex flex-col gap-4 lg:gap-8 overflow-y-auto pb-24 lg:pb-32 hide-scrollbar px-2 relative"
+      style={{ transform: `translateY(${pullDistance}px)`, transition: isPulling.current ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1)' }}
+    >
+      {/* Refresh Indicator */}
+      <div 
+        className="absolute left-0 right-0 flex items-center justify-center transition-opacity" 
+        style={{ top: `-${Math.max(40, pullDistance)}px`, opacity: pullDistance / PULL_THRESHOLD }}
+      >
+        <div className={`w-10 h-10 rounded-full glass-panel flex items-center justify-center shadow-2xl ${isRefreshing ? 'animate-spin' : ''}`}>
+           <i className={`fa-solid fa-gem text-pink-500 transition-transform ${pullDistance > PULL_THRESHOLD ? 'rotate-180 scale-125' : ''}`}></i>
+        </div>
+      </div>
+
+      {isRefreshing && (
+        <div className="flex items-center justify-center py-4 animate-pulse">
+           <span className="text-[10px] font-black text-pink-500 uppercase tracking-[0.3em]">Syncing Elite Vault...</span>
+        </div>
+      )}
       
       {/* Placement: Under Header */}
       {renderAd('under_header')}
@@ -166,9 +262,6 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
         </div>
       </div>
 
-      {/* Placement: Before Publication */}
-      {renderAd('before_publication')}
-
       {/* Publications List */}
       <div className="space-y-6 lg:space-y-10">
         {publications.map((pub, idx) => (
@@ -184,9 +277,11 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
         ))}
       </div>
 
-      {/* Placement: Footer */}
-      <div className="pt-8 opacity-50">
-        {renderAd('footer')}
+      {/* Manual Refresh Hint */}
+      <div className="flex justify-center py-10 opacity-30">
+         <button onClick={triggerRefresh} className="text-[10px] font-black text-zinc-500 uppercase tracking-widest hover:text-white transition-colors">
+            Tap to Load Older Threads
+         </button>
       </div>
     </div>
   );
