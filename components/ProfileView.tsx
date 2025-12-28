@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useMemo } from 'react';
 import { ViewType, WithdrawalRecord } from '../types';
-import { db, UserDB, AlbumPhoto } from '../services/databaseService';
+import { db, UserDB, AlbumPhoto, MIN_WITHDRAW_USD, GEMS_PER_DOLLAR } from '../services/databaseService';
 
 interface ProfileViewProps {
   user: UserDB;
@@ -30,7 +30,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
   const [showAlbumModal, setShowAlbumModal] = useState(false);
   const [editingPhoto, setEditingPhoto] = useState<AlbumPhoto | null>(null);
   
-  const [withdrawData, setWithdrawData] = useState({ email: user.email, gems: 100 });
+  const [withdrawData, setWithdrawData] = useState({ email: user.email, gems: 2000 });
   const [photoForm, setPhotoForm] = useState({ url: '', price: 0, caption: '' });
   const [isProcessing, setIsProcessing] = useState(false);
   const [toast, setToast] = useState<{msg: string, type: 'success' | 'error'} | null>(null);
@@ -153,6 +153,9 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
     }
     setIsProcessing(false);
   };
+
+  const currentUsdValue = user.diamonds / GEMS_PER_DOLLAR;
+  const canWithdraw = currentUsdValue >= MIN_WITHDRAW_USD;
 
   return (
     <div className="max-w-6xl mx-auto h-full flex flex-col gap-4 overflow-y-auto pb-24 lg:pb-32 hide-scrollbar px-1 relative">
@@ -302,7 +305,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
           <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="glass-panel p-8 rounded-[2.5rem] border-white/10 bg-gradient-to-br from-cyan-600/10 to-transparent">
-                 <p className="text-[10px] font-black text-cyan-400 uppercase tracking-widest mb-3">Diamond Balance</p>
+                 <p className="text-[10px] font-black text-cyan-400 uppercase tracking-widest mb-3">Gem Balance</p>
                  <div className="flex items-center gap-4 mb-6">
                     <i className="fa-solid fa-gem text-4xl text-cyan-400"></i>
                     <h2 className="text-5xl font-black text-white">{user.diamonds.toLocaleString()}</h2>
@@ -314,9 +317,22 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
                  <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-3">Cash Earnings</p>
                  <div className="flex items-center gap-4 mb-6">
                     <i className="fa-solid fa-money-bill-transfer text-4xl text-emerald-400"></i>
-                    <h2 className="text-5xl font-black text-white">${(user.diamonds / 100).toFixed(2)}</h2>
+                    <h2 className="text-5xl font-black text-white">${currentUsdValue.toFixed(2)}</h2>
                  </div>
-                 <button onClick={() => setShowWithdrawModal(true)} className="w-full py-4 bg-emerald-600 text-white font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-xl shadow-emerald-600/20 active:scale-95 transition-all">Withdraw Cash</button>
+                 <div className="space-y-3">
+                    <button 
+                      onClick={() => setShowWithdrawModal(true)} 
+                      disabled={!canWithdraw}
+                      className="w-full py-4 bg-emerald-600 text-white font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-xl shadow-emerald-600/20 active:scale-95 transition-all disabled:opacity-50 disabled:grayscale"
+                    >
+                      Withdraw Cash
+                    </button>
+                    {!canWithdraw && (
+                       <p className="text-[9px] text-amber-500 font-bold uppercase tracking-widest text-center">
+                          Need ${(MIN_WITHDRAW_USD - currentUsdValue).toFixed(2)} more to reach $20 minimum.
+                       </p>
+                    )}
+                 </div>
               </div>
             </div>
 
@@ -365,14 +381,14 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
                   </div>
                   <div>
                     <h2 className="text-xl font-black text-white uppercase tracking-tighter">Elite Invitations</h2>
-                    <p className="text-[8px] text-zinc-500 uppercase font-black tracking-widest">Invite Friends • Earn Diamonds</p>
+                    <p className="text-[8px] text-zinc-500 uppercase font-black tracking-widest">Invite Friends • Earn Gems</p>
                   </div>
                 </div>
 
                 <div className="space-y-6">
                    <div className="p-6 bg-black/40 border border-white/5 rounded-2xl space-y-4">
                       <p className="text-xs text-zinc-400 leading-relaxed font-bold italic">
-                        Share your unique elite link. For every friend who joins the circle, you receive <span className="text-pink-500">500 Diamonds</span>.
+                        Share your unique elite link. For every friend who joins the circle, you receive <span className="text-pink-500">50 Gems</span>.
                       </p>
                       
                       <div className="relative group">
@@ -557,7 +573,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
               <div className="text-center space-y-2">
                  <div className="w-16 h-16 rounded-full bg-emerald-600/20 flex items-center justify-center text-3xl text-emerald-400 mx-auto border border-emerald-500/20"><i className="fa-solid fa-vault"></i></div>
                  <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Convert to Cash</h3>
-                 <p className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">100 Gems = $1.00 USD</p>
+                 <p className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">100 Gems = $1.00 USD | Min $20.00</p>
               </div>
 
               <div className="space-y-4">
@@ -574,6 +590,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
                     <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Gems to Convert</label>
                     <input 
                       type="number" 
+                      min={MIN_WITHDRAW_USD * GEMS_PER_DOLLAR}
                       value={withdrawData.gems}
                       onChange={(e) => setWithdrawData({...withdrawData, gems: parseInt(e.target.value) || 0})}
                       className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 px-6 text-xs text-white focus:outline-none focus:border-emerald-500/50" 
@@ -581,13 +598,13 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
                  </div>
                  <div className="p-4 bg-zinc-900 rounded-2xl border border-white/5 flex justify-between items-center">
                     <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">You will receive</span>
-                    <span className="text-lg font-black text-emerald-400">${(withdrawData.gems / 100).toFixed(2)}</span>
+                    <span className="text-lg font-black text-emerald-400">${(withdrawData.gems / GEMS_PER_DOLLAR).toFixed(2)}</span>
                  </div>
               </div>
 
               <button 
                 onClick={handleWithdraw}
-                disabled={isProcessing || withdrawData.gems < 100 || withdrawData.gems > user.diamonds}
+                disabled={isProcessing || withdrawData.gems < (MIN_WITHDRAW_USD * GEMS_PER_DOLLAR) || withdrawData.gems > user.diamonds}
                 className="w-full py-5 bg-emerald-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-2xl active:scale-95 disabled:opacity-50"
               >
                 {isProcessing ? <i className="fa-solid fa-circle-notch animate-spin"></i> : 'CONFIRM WITHDRAWAL'}

@@ -11,6 +11,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ totalRevenue }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'ads' | 'treasury' | 'nodes'>('overview');
   const [platformStats, setPlatformStats] = useState<any>(null);
   const [allUsers, setAllUsers] = useState<UserDB[]>([]);
+  const [allWithdrawals, setAllWithdrawals] = useState<any[]>([]);
   const [ads, setAds] = useState<AdConfig[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -28,14 +29,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ totalRevenue }) => {
 
   const refreshData = async () => {
     setIsLoading(true);
-    const [stats, users, currentAds] = await Promise.all([
+    const [stats, users, currentAds, withdrawals] = await Promise.all([
       db.getPlatformStats(),
       db.getAllUsers(),
-      db.getAds()
+      db.getAds(),
+      db.getAllWithdrawals()
     ]);
     setPlatformStats(stats);
     setAllUsers(users);
     setAds(currentAds);
+    setAllWithdrawals(withdrawals);
     setIsLoading(false);
   };
 
@@ -120,7 +123,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ totalRevenue }) => {
   const navItems = [
     { id: 'overview', label: 'Command Center', icon: 'fa-chart-pie' },
     { id: 'users', label: 'User Repository', icon: 'fa-users-gear' },
-    { id: 'treasury', label: 'Platform Wallet', icon: 'fa-vault' },
+    { id: 'treasury', label: 'Treasury & Sales', icon: 'fa-vault' },
     { id: 'ads', label: 'Ad Engine', icon: 'fa-rectangle-ad' },
     { id: 'nodes', label: 'Infrastructure', icon: 'fa-server' },
   ] as const;
@@ -227,8 +230,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ totalRevenue }) => {
             <div className="space-y-8 animate-in fade-in duration-500">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                  {[
-                   { label: 'Platform Revenue', value: `$${platformStats.revenue.toFixed(2)}`, icon: 'fa-dollar-sign', color: 'text-emerald-400', bg: 'bg-emerald-500/5' },
-                   { label: 'Diamonds in Circulation', value: (platformStats.liabilityUsd * 100).toLocaleString(), icon: 'fa-gem', color: 'text-cyan-400', bg: 'bg-cyan-500/5' },
+                   { label: 'Total Sales Revenue', value: `$${platformStats.revenue.toFixed(2)}`, icon: 'fa-dollar-sign', color: 'text-emerald-400', bg: 'bg-emerald-500/5' },
+                   { label: 'Circulating Gems', value: (platformStats.liabilityUsd * 100).toLocaleString(), icon: 'fa-gem', color: 'text-cyan-400', bg: 'bg-cyan-500/5' },
                    { label: 'Total Entities', value: platformStats.userCount, icon: 'fa-users', color: 'text-pink-400', bg: 'bg-pink-500/5' },
                    { label: 'Total Payouts', value: `$${platformStats.totalPayouts.toFixed(2)}`, icon: 'fa-money-bill-transfer', color: 'text-indigo-400', bg: 'bg-indigo-500/5' },
                  ].map((stat, i) => (
@@ -255,10 +258,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ totalRevenue }) => {
                   </div>
                   <div className="space-y-4">
                      {[
-                       { name: 'Core Database cluster', status: 'Optimal', value: '99.9%', color: 'text-emerald-500' },
-                       { name: 'Real-time Audio Node', status: 'Synced', value: '12ms', color: 'text-cyan-500' },
-                       { name: 'Publication Sychronizer', status: 'Active', value: 'Live', color: 'text-pink-500' },
-                       { name: 'Treasury Wallet Lock', status: 'Secure', value: 'Encypted', color: 'text-indigo-500' },
+                       { name: 'Payment Capture API', status: 'Online', value: 'Sync: Active', color: 'text-emerald-500' },
+                       { name: 'Withdrawal Processor', status: 'Ready', value: '$20 Min Enforcement', color: 'text-cyan-500' },
+                       { name: 'Core Ledger Synchronizer', status: 'Synced', value: '100%', color: 'text-pink-500' },
+                       { name: 'Admin Settlement Node', status: 'Secured', value: 'Encrypted', color: 'text-indigo-500' },
                      ].map((node, i) => (
                        <div key={i} className="flex justify-between items-center p-5 bg-white/5 rounded-2xl border border-white/5 group hover:bg-white/10 transition-all">
                           <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{node.name}</span>
@@ -332,7 +335,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ totalRevenue }) => {
                             <td className="p-8">
                                <div className="flex flex-col gap-2">
                                   <span className="text-cyan-400 font-black flex items-center gap-2 text-xs"><i className="fa-solid fa-gem text-[10px]"></i> {u.diamonds.toLocaleString()}</span>
-                                  <span className="text-emerald-500 font-black tracking-widest">${u.usd_balance.toFixed(2)} USD</span>
+                                  <span className="text-emerald-500 font-black tracking-widest">${(u.diamonds / 100).toFixed(2)} USD Value</span>
                                </div>
                             </td>
                             <td className="p-8">
@@ -389,7 +392,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ totalRevenue }) => {
                       </div>
                       <div className="mt-12 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6">
                          <div className="space-y-1">
-                            <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.3em]">Total Revenue Capture</p>
+                            <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.3em]">Total Revenue Capture (Sales)</p>
                             <p className="text-5xl font-black text-white tracking-tighter">${platformStats.revenue.toLocaleString()}</p>
                          </div>
                          <button className="px-10 py-5 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-indigo-500 transition-all shadow-2xl shadow-indigo-600/40 active:scale-95">Withdraw Revenue</button>
@@ -404,7 +407,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ totalRevenue }) => {
                       </div>
                       <div className="space-y-6">
                          <div className="flex justify-between items-center border-b border-white/5 pb-6">
-                            <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest italic">Member Diamond Liability</span>
+                            <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest italic">Member Gem Liability</span>
                             <span className="text-2xl font-black text-cyan-400">${platformStats.liabilityUsd.toLocaleString()}</span>
                          </div>
                          <div className="flex justify-between items-center border-b border-white/5 pb-6">
@@ -418,6 +421,40 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ totalRevenue }) => {
                                <p className="text-[8px] text-zinc-600 font-bold uppercase tracking-widest mt-1">Ready for settlement</p>
                             </div>
                          </div>
+                      </div>
+                   </div>
+                </div>
+
+                <div className="space-y-6">
+                   <h3 className="text-xl font-black text-white uppercase italic tracking-tighter">Withdrawal Management</h3>
+                   <div className="glass-panel rounded-[2.5rem] border-white/5 overflow-hidden shadow-2xl">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="border-b border-white/5 text-[9px] text-zinc-600 uppercase tracking-widest bg-white/[0.02]">
+                              <th className="p-8 font-black">User</th>
+                              <th className="p-8 font-black">PayPal Email</th>
+                              <th className="p-8 font-black">Amount</th>
+                              <th className="p-8 font-black">Timestamp</th>
+                              <th className="p-8 font-black">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="text-[10px]">
+                            {allWithdrawals.length > 0 ? allWithdrawals.map((w, i) => (
+                              <tr key={i} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                                <td className="p-8 font-black text-white">{w.userName}</td>
+                                <td className="p-8 text-zinc-400 font-mono">{w.paypalEmail}</td>
+                                <td className="p-8 text-emerald-500 font-black">${w.amountUsd.toFixed(2)}</td>
+                                <td className="p-8 text-zinc-500">{new Date(w.timestamp).toLocaleString()}</td>
+                                <td className="p-8">
+                                  <span className="px-3 py-1 bg-emerald-500/10 text-emerald-500 rounded-lg text-[8px] font-black uppercase tracking-widest">{w.status}</span>
+                                </td>
+                              </tr>
+                            )) : (
+                              <tr><td colSpan={5} className="p-16 text-center text-zinc-600 font-bold uppercase tracking-widest">No withdrawal requests found</td></tr>
+                            )}
+                          </tbody>
+                        </table>
                       </div>
                    </div>
                 </div>
@@ -529,6 +566,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ totalRevenue }) => {
                  <div className="p-6 bg-black/40 rounded-2xl border border-white/5 flex flex-col gap-4">
                     <div className="flex justify-between items-center">
                        <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Current Balance</span>
+                       {/* Fix: replaced 'u' with 'gemTargetUser' */}
                        <span className="text-lg font-black text-white">{gemTargetUser.diamonds.toLocaleString()} <i className="fa-solid fa-gem text-cyan-400 text-xs ml-1"></i></span>
                     </div>
                     <div className="flex justify-between items-center border-t border-white/5 pt-4">

@@ -2,6 +2,8 @@
 import { WithdrawalRecord, Publication, AdConfig } from '../types';
 
 const DB_NAME = 'mydoll_cloud_db_v3';
+export const MIN_WITHDRAW_USD = 20;
+export const GEMS_PER_DOLLAR = 100;
 
 export interface AlbumPhoto {
   id: string;
@@ -62,8 +64,8 @@ class DatabaseService {
           'admin@mydoll.club': {
             name: 'Wahab Fresh',
             email: 'admin@mydoll.club',
-            diamonds: 0, // Reset to zero
-            usd_balance: 0, // Reset to zero
+            diamonds: 0,
+            usd_balance: 0,
             withdrawals: [],
             album: [],
             bio: 'Master Node Administrator',
@@ -78,8 +80,8 @@ class DatabaseService {
           }
         },
         platform: { 
-          revenue: 0, // Reset to zero
-          totalPayouts: 0, // Reset to zero
+          revenue: 0,
+          totalPayouts: 0,
           transactions: [],
           merchantConfig: {
             clientId: "AchOwxrubWXLdT64U9AmBydM9n7EEgA_psh3nXWi0PPhRvxZRtdHNCpXYxggnKV-dMef3JGMMzdeGvEW",
@@ -101,18 +103,14 @@ class DatabaseService {
   }
 
   async resetAllWallets(): Promise<void> {
-    // Platform Level
     this.data.platform.revenue = 0;
     this.data.platform.totalPayouts = 0;
     this.data.platform.transactions = [];
-    
-    // User Level
     Object.keys(this.data.users).forEach(email => {
       this.data.users[email].diamonds = 0;
       this.data.users[email].usd_balance = 0;
       this.data.users[email].withdrawals = [];
     });
-    
     this.save();
   }
 
@@ -124,6 +122,16 @@ class DatabaseService {
     return Object.values(this.data.users).sort((a, b) => 
       new Date(b.joinedAt || 0).getTime() - new Date(a.joinedAt || 0).getTime()
     );
+  }
+
+  async getAllWithdrawals(): Promise<(WithdrawalRecord & { userEmail: string; userName: string })[]> {
+    const all: (WithdrawalRecord & { userEmail: string; userName: string })[] = [];
+    Object.values(this.data.users).forEach(user => {
+      (user.withdrawals || []).forEach(w => {
+        all.push({ ...w, userEmail: user.email, userName: user.name });
+      });
+    });
+    return all.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }
 
   async deleteUser(email: string): Promise<void> {
@@ -207,7 +215,7 @@ class DatabaseService {
       merchantId: this.data.platform.merchantConfig.clientId,
       isLive: this.data.platform.merchantConfig.isLive,
       userCount: users.length,
-      liabilityUsd: totalDiamondsInSystem / 100,
+      liabilityUsd: totalDiamondsInSystem / GEMS_PER_DOLLAR,
       dollCount: users.filter(u => u.role === 'doll').length,
       mentorCount: users.filter(u => u.role === 'mentor').length,
     };
@@ -227,8 +235,19 @@ class DatabaseService {
 
   async requestWithdrawal(userEmail: string, paypalEmail: string, gemsToConvert: number): Promise<{success: boolean, message: string}> {
     const user = this.data.users[userEmail];
-    if (!user || user.diamonds < gemsToConvert) return { success: false, message: "Insufficient balance." };
-    const amountUsd = gemsToConvert / 100;
+    if (!user) return { success: false, message: "User not found." };
+    
+    // Check minimum withdrawal: $20 = 2000 gems
+    const minGemsRequired = MIN_WITHDRAW_USD * GEMS_PER_DOLLAR;
+    if (gemsToConvert < minGemsRequired) {
+      return { success: false, message: `Minimum withdrawal is $${MIN_WITHDRAW_USD} (${minGemsRequired} Gems).` };
+    }
+
+    if (user.diamonds < gemsToConvert) {
+      return { success: false, message: "Insufficient balance." };
+    }
+
+    const amountUsd = gemsToConvert / GEMS_PER_DOLLAR;
     user.diamonds -= gemsToConvert;
     this.data.platform.totalPayouts += amountUsd;
     const record: WithdrawalRecord = {
