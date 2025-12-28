@@ -210,7 +210,12 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack }) => 
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-6">
               {galleryPhotos.filter(p => p.type === activeGalleryType).map((item) => (
                 <div key={item.id} className="group relative aspect-square rounded-[2rem] lg:rounded-[2.5rem] overflow-hidden border border-white/5 bg-zinc-900 shadow-xl cursor-pointer">
-                  <img src={item.url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="gallery" />
+                  {/* Mystery Blur for fans, or creator viewing paid content */}
+                  <img 
+                    src={item.url} 
+                    className={`w-full h-full object-cover transition-all duration-700 ${item.type === 'paid' && !isEditing ? 'blur-2xl scale-110 brightness-50' : 'group-hover:scale-110'}`} 
+                    alt="gallery" 
+                  />
                   
                   {item.type === 'paid' && (
                     <div className="absolute top-4 right-4 px-3 py-1 bg-indigo-600/90 backdrop-blur-md rounded-lg shadow-xl border border-white/20 z-10 flex items-center gap-2">
@@ -219,7 +224,16 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack }) => 
                     </div>
                   )}
 
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-6">
+                  {item.type === 'paid' && !isEditing && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-[5]">
+                       <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20">
+                          <i className="fa-solid fa-lock text-white text-xl"></i>
+                       </div>
+                       <p className="text-[8px] font-black text-white/60 uppercase tracking-[0.3em]">Premium Content</p>
+                    </div>
+                  )}
+
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-6 z-10">
                      <div className="flex items-center justify-between mb-4">
                        <span className="text-[10px] font-black text-white flex items-center gap-2">
                          <i className="fa-solid fa-heart text-pink-500"></i> {item.likes}

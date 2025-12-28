@@ -12,12 +12,42 @@ import AdminDashboard from './components/AdminDashboard';
 import BottomNav from './components/BottomNav';
 import { ViewType } from './types';
 
+const SESSION_KEY = 'mydoll_session_v1';
+
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
-  const [user, setUser] = useState<{ name: string; email: string; bio?: string } | null>(null);
+  const [user, setUser] = useState<{ name: string; email: string; bio?: string; avatar?: string; cover?: string } | null>(null);
   const [currentView, setCurrentView] = useState<ViewType>('feed');
+
+  // Load session from localStorage on mount
+  useEffect(() => {
+    const savedSession = localStorage.getItem(SESSION_KEY);
+    if (savedSession) {
+      try {
+        const { user: savedUser, isAdmin: savedIsAdmin } = JSON.parse(savedSession);
+        setUser(savedUser);
+        setIsAdmin(savedIsAdmin);
+        setIsAuthenticated(true);
+        // If they were on admin, stay on admin, else go to feed
+        if (savedIsAdmin && window.location.hash === '#/admin-portal') {
+          setCurrentView('admin');
+        }
+      } catch (e) {
+        localStorage.removeItem(SESSION_KEY);
+      }
+    }
+  }, []);
+
+  // Sync session to localStorage whenever auth state changes
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      localStorage.setItem(SESSION_KEY, JSON.stringify({ user, isAdmin }));
+    } else {
+      localStorage.removeItem(SESSION_KEY);
+    }
+  }, [isAuthenticated, user, isAdmin]);
 
   // Secret Link Detection
   useEffect(() => {
@@ -32,29 +62,30 @@ const App: React.FC = () => {
   }, []);
 
   const handleLogin = (name: string, email: string, password?: string) => {
-    // Check for specific admin credentials or secret portal access
     const isAdminUser = 
       (email === 'wahabfresh' || name === 'wahabfresh' || email === 'admin@mydoll.club') && 
       password === 'vampirewahab31';
     
     const isPortalAccess = window.location.hash === '#/admin-portal';
 
+    let loggedInUser;
     if (isAdminUser || isPortalAccess) {
       setIsAdmin(true);
       setCurrentView('admin');
-      setUser({ 
+      loggedInUser = { 
         name: isAdminUser ? 'Wahab Fresh' : name, 
         email: isAdminUser ? 'admin@mydoll.club' : email, 
         bio: "Master Node Administrator. System access granted." 
-      });
+      };
     } else {
-      setUser({ name, email, bio: "Elite member and digital connoisseur." });
+      loggedInUser = { name, email, bio: "Elite member and digital connoisseur." };
     }
     
+    setUser(loggedInUser);
     setIsAuthenticated(true);
   };
 
-  const handleUpdateUser = (updatedData: { name: string; email: string; bio?: string }) => {
+  const handleUpdateUser = (updatedData: Partial<{ name: string; email: string; bio?: string; avatar?: string; cover?: string }>) => {
     setUser(prev => prev ? { ...prev, ...updatedData } : null);
   };
 
@@ -65,6 +96,7 @@ const App: React.FC = () => {
     setUser(null);
     setCurrentView('feed');
     window.location.hash = '';
+    localStorage.removeItem(SESSION_KEY);
   };
 
   if (!isAuthenticated) {
