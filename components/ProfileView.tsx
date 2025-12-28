@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { ViewType, WithdrawalRecord } from '../types';
 import { db, UserDB, AlbumPhoto } from '../services/databaseService';
 
@@ -20,16 +20,26 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
   
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState<'showcase' | 'wallet' | 'settings'>('showcase');
+  const [galleryFilter, setGalleryFilter] = useState<'all' | 'free' | 'premium'>('all');
+  
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
-  const [showAlbumUploadModal, setShowAlbumUploadModal] = useState(false);
+  const [showAlbumModal, setShowAlbumModal] = useState(false);
+  const [editingPhoto, setEditingPhoto] = useState<AlbumPhoto | null>(null);
+  
   const [withdrawData, setWithdrawData] = useState({ email: user.email, gems: 100 });
-  const [newPhotoData, setNewPhotoData] = useState({ url: '', price: 0, caption: '' });
+  const [photoForm, setPhotoForm] = useState({ url: '', price: 0, caption: '' });
   const [isProcessing, setIsProcessing] = useState(false);
   const [toast, setToast] = useState<{msg: string, type: 'success' | 'error'} | null>(null);
 
   const coverInputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const albumInputRef = useRef<HTMLInputElement>(null);
+
+  const filteredAlbum = useMemo(() => {
+    if (galleryFilter === 'free') return formData.album.filter(p => p.price <= 0);
+    if (galleryFilter === 'premium') return formData.album.filter(p => p.price > 0);
+    return formData.album;
+  }, [formData.album, galleryFilter]);
 
   const handleSaveProfile = async () => {
     const updated = await db.upsertUser(formData);
@@ -55,27 +65,54 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
       } else if (target === 'cover') {
         setFormData({ ...formData, cover: result });
       } else if (target === 'album') {
-        setNewPhotoData({ ...newPhotoData, url: result });
-        setShowAlbumUploadModal(true);
+        setEditingPhoto(null);
+        setPhotoForm({ url: result, price: 0, caption: '' });
+        setShowAlbumModal(true);
       }
     };
     reader.readAsDataURL(file);
   };
 
-  const handleAddAlbumPhoto = () => {
-    const newPhoto: AlbumPhoto = {
-      id: `photo_${Date.now()}`,
-      url: newPhotoData.url,
-      price: newPhotoData.price,
-      caption: newPhotoData.caption
-    };
-    const updatedAlbum = [...formData.album, newPhoto];
+  const handleSavePhoto = () => {
+    let updatedAlbum: AlbumPhoto[];
+    if (editingPhoto) {
+      // Update existing
+      updatedAlbum = formData.album.map(p => 
+        p.id === editingPhoto.id ? { ...p, price: photoForm.price, caption: photoForm.caption } : p
+      );
+    } else {
+      // Add new
+      const newPhoto: AlbumPhoto = {
+        id: `photo_${Date.now()}`,
+        url: photoForm.url,
+        price: photoForm.price,
+        caption: photoForm.caption
+      };
+      updatedAlbum = [...formData.album, newPhoto];
+    }
+
     const newFormData = { ...formData, album: updatedAlbum };
     setFormData(newFormData);
-    db.upsertUser(newFormData); // Direct persist for album changes
-    setShowAlbumUploadModal(false);
-    setNewPhotoData({ url: '', price: 0, caption: '' });
-    showToast("Photo added to collection", "success");
+    db.upsertUser(newFormData);
+    setShowAlbumModal(false);
+    setPhotoForm({ url: '', price: 0, caption: '' });
+    setEditingPhoto(null);
+    showToast(editingPhoto ? "Photo updated" : "Photo added", "success");
+  };
+
+  const handleDeletePhoto = (id: string) => {
+    if (!confirm("Are you sure you want to delete this photo?")) return;
+    const updatedAlbum = formData.album.filter(p => p.id !== id);
+    const newFormData = { ...formData, album: updatedAlbum };
+    setFormData(newFormData);
+    db.upsertUser(newFormData);
+    showToast("Photo removed", "success");
+  };
+
+  const openEditPhoto = (photo: AlbumPhoto) => {
+    setEditingPhoto(photo);
+    setPhotoForm({ url: photo.url, price: photo.price, caption: photo.caption || '' });
+    setShowAlbumModal(true);
   };
 
   const handleWithdraw = async () => {
@@ -169,8 +206,21 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
       <div className="px-4 lg:px-12 pb-10 mt-6">
         {activeTab === 'showcase' && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-black text-white uppercase tracking-widest">My Gallery</h3>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <h3 className="text-xs font-black text-white uppercase tracking-widest">My Gallery</h3>
+                <div className="flex bg-zinc-900 rounded-lg p-1 border border-white/5">
+                  {['all', 'free', 'premium'].map(f => (
+                    <button 
+                      key={f}
+                      onClick={() => setGalleryFilter(f as any)}
+                      className={`px-3 py-1.5 rounded-md text-[8px] font-black uppercase tracking-widest transition-all ${galleryFilter === f ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <button 
                 onClick={() => albumInputRef.current?.click()}
                 className="px-4 py-2 bg-pink-600/10 border border-pink-500/20 text-pink-500 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-pink-600 hover:text-white transition-all"
@@ -180,20 +230,30 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
               </button>
             </div>
 
-            {formData.album && formData.album.length > 0 ? (
+            {filteredAlbum.length > 0 ? (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {formData.album.map((photo) => (
+                {filteredAlbum.map((photo) => (
                   <div key={photo.id} className="group relative aspect-[3/4] rounded-2xl overflow-hidden border border-white/5 shadow-xl bg-zinc-900">
-                    <img src={photo.url} className="w-full h-full object-cover transition-transform group-hover:scale-110 duration-500" alt={photo.caption} />
+                    <div className={`w-full h-full transition-all duration-500 ${photo.price > 0 ? 'blur-md group-hover:blur-[2px]' : ''}`}>
+                      <img src={photo.url} className="w-full h-full object-cover transition-transform group-hover:scale-110 duration-700" alt={photo.caption} />
+                    </div>
+                    
+                    {/* Hover Overlay with Controls */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-4">
                       {photo.caption && <p className="text-[10px] text-white font-bold mb-1 truncate">{photo.caption}</p>}
                       <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-black text-pink-500 uppercase">{photo.price > 0 ? `${photo.price} Gems` : 'Free'}</span>
-                        <button className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white"><i className="fa-solid fa-ellipsis-v text-[10px]"></i></button>
+                        <span className={`text-[9px] font-black uppercase ${photo.price > 0 ? 'text-pink-500' : 'text-emerald-400'}`}>
+                          {photo.price > 0 ? `${photo.price} Gems` : 'Free'}
+                        </span>
+                        <div className="flex gap-2">
+                           <button onClick={() => openEditPhoto(photo)} className="w-8 h-8 rounded-lg bg-white/10 hover:bg-indigo-600 flex items-center justify-center text-white transition-all"><i className="fa-solid fa-pen text-[8px]"></i></button>
+                           <button onClick={() => handleDeletePhoto(photo.id)} className="w-8 h-8 rounded-lg bg-white/10 hover:bg-red-600 flex items-center justify-center text-white transition-all"><i className="fa-solid fa-trash text-[8px]"></i></button>
+                        </div>
                       </div>
                     </div>
+
                     {photo.price > 0 && (
-                      <div className="absolute top-2 right-2 px-2 py-1 bg-zinc-950/80 backdrop-blur-md rounded-lg border border-white/10 flex items-center gap-1.5">
+                      <div className="absolute top-2 right-2 px-2 py-1 bg-zinc-950/80 backdrop-blur-md rounded-lg border border-white/10 flex items-center gap-1.5 z-10">
                          <i className="fa-solid fa-lock text-[8px] text-pink-500"></i>
                          <span className="text-[9px] font-black text-white">{photo.price}</span>
                       </div>
@@ -204,7 +264,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
             ) : (
               <div className="text-center py-20 opacity-30 border-2 border-dashed border-white/10 rounded-[3rem]">
                 <i className="fa-solid fa-images text-4xl mb-4"></i>
-                <p className="text-xs uppercase font-black tracking-widest">No photos in your collection yet</p>
+                <p className="text-xs uppercase font-black tracking-widest">No matching photos</p>
               </div>
             )}
           </div>
@@ -269,19 +329,23 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
         )}
       </div>
 
-      {/* Album Upload Modal */}
-      {showAlbumUploadModal && (
+      {/* Album Modal (Add/Edit) */}
+      {showAlbumModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-zinc-950/90 backdrop-blur-xl animate-in fade-in duration-300">
            <div className="w-full max-w-md glass-panel p-8 rounded-[3rem] border-white/10 shadow-2xl space-y-6 relative overflow-hidden">
-              <button onClick={() => setShowAlbumUploadModal(false)} className="absolute top-6 right-6 text-zinc-600 hover:text-white"><i className="fa-solid fa-xmark text-lg"></i></button>
+              <button onClick={() => setShowAlbumModal(false)} className="absolute top-6 right-6 text-zinc-600 hover:text-white"><i className="fa-solid fa-xmark text-lg"></i></button>
               
               <div className="text-center space-y-2">
-                 <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Add to Gallery</h3>
-                 <p className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">Post a free or premium photo</p>
+                 <h3 className="text-2xl font-black text-white uppercase tracking-tighter">
+                   {editingPhoto ? 'Edit Photo' : 'Add to Gallery'}
+                 </h3>
+                 <p className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">
+                   {photoForm.price > 0 ? 'Premium Content' : 'Free Content'}
+                 </p>
               </div>
 
-              <div className="aspect-[4/5] rounded-2xl overflow-hidden border border-white/5 bg-zinc-900">
-                <img src={newPhotoData.url} className="w-full h-full object-cover" alt="preview" />
+              <div className={`aspect-[4/5] rounded-2xl overflow-hidden border border-white/5 bg-zinc-900 ${photoForm.price > 0 ? 'blur-sm' : ''}`}>
+                <img src={photoForm.url} className="w-full h-full object-cover" alt="preview" />
               </div>
 
               <div className="space-y-4">
@@ -289,8 +353,8 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
                     <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Caption</label>
                     <input 
                       type="text" 
-                      value={newPhotoData.caption}
-                      onChange={(e) => setNewPhotoData({...newPhotoData, caption: e.target.value})}
+                      value={photoForm.caption}
+                      onChange={(e) => setPhotoForm({...photoForm, caption: e.target.value})}
                       placeholder="Summer vibes..."
                       className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 px-6 text-xs text-white focus:outline-none focus:border-pink-500/50" 
                     />
@@ -299,8 +363,8 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
                     <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Price (Gems)</label>
                     <input 
                       type="number" 
-                      value={newPhotoData.price}
-                      onChange={(e) => setNewPhotoData({...newPhotoData, price: parseInt(e.target.value) || 0})}
+                      value={photoForm.price}
+                      onChange={(e) => setPhotoForm({...photoForm, price: parseInt(e.target.value) || 0})}
                       placeholder="0 for free"
                       className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 px-6 text-xs text-white focus:outline-none focus:border-pink-500/50" 
                     />
@@ -309,10 +373,10 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
               </div>
 
               <button 
-                onClick={handleAddAlbumPhoto}
+                onClick={handleSavePhoto}
                 className="w-full py-5 bg-pink-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-2xl active:scale-95"
               >
-                UPLOAD TO COLLECTION
+                {editingPhoto ? 'SAVE CHANGES' : 'UPLOAD TO COLLECTION'}
               </button>
            </div>
         </div>
