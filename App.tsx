@@ -35,6 +35,8 @@ const AppContent: React.FC = () => {
 
     const init = async () => {
       const hash = window.location.hash;
+      
+      // Handle Referral
       if (hash.includes('ref=')) {
         try {
           const encodedEmail = hash.split('ref=')[1];
@@ -45,21 +47,32 @@ const AppContent: React.FC = () => {
         }
       }
 
-      if (hash === '#/admin-portal') {
-        setShowAuth(true);
-      }
-
+      // Restore Session
       const savedSession = localStorage.getItem('mydoll_active_user');
       if (savedSession) {
         const u = await db.getUser(savedSession);
         if (u) {
           setUser(u);
           setIsAuthenticated(true);
-          if (u.email === 'admin@mydoll.club' || u.name === 'wahabfresh') {
+          
+          // Check Admin Status
+          const isSystemAdmin = u.email === 'admin@mydoll.club' || u.name === 'wahabfresh' || u.role === 'admin';
+          if (isSystemAdmin) {
             setIsAdmin(true);
+            // If we are admin, stay in admin view unless explicitly navigated away
+            // Or if the hash specifically points to admin portal
+            if (hash === '#/admin-portal' || !hash || hash === '#/') {
+              setCurrentView('admin');
+            }
           }
         }
       }
+
+      // Always allow showing auth if hash is admin portal even if not logged in
+      if (hash === '#/admin-portal' && !savedSession) {
+        setShowAuth(true);
+      }
+
       const rev = await db.getPlatformRevenue();
       setPlatformRevenue(rev);
     };
@@ -78,18 +91,19 @@ const AppContent: React.FC = () => {
       u = await db.upsertUser({ 
         name, 
         email, 
-        diamonds: isAdminUser ? 99999 : 50,
+        diamonds: isAdminUser ? 0 : 50, // Starting at 0 as requested previously for admin
         bio: isAdminUser ? "Master Node Administrator" : "Elite member",
         usd_balance: 0,
         withdrawals: [],
         album: [],
         referredBy: pendingReferrer || undefined,
-        referralCount: 0
+        referralCount: 0,
+        role: isAdminUser ? 'admin' : 'doll'
       });
       setPendingReferrer(null);
     }
 
-    if (isAdminUser || window.location.hash === '#/admin-portal') {
+    if (isAdminUser || u.role === 'admin' || window.location.hash === '#/admin-portal') {
       setIsAdmin(true);
       setCurrentView('admin');
     }
@@ -97,7 +111,10 @@ const AppContent: React.FC = () => {
     setUser(u);
     setIsAuthenticated(true);
     localStorage.setItem('mydoll_active_user', email);
-    window.location.hash = '';
+    // Clear hash only if it wasn't the admin portal (to allow refresh logic to work)
+    if (window.location.hash !== '#/admin-portal') {
+      window.location.hash = '';
+    }
   };
 
   const handleUpdateUser = async (updatedData: Partial<UserDB>) => {
