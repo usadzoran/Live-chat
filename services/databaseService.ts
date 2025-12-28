@@ -23,6 +23,8 @@ export interface UserDB {
   dob?: string;
   gender?: 'men' | 'women' | 'other';
   country?: string;
+  referredBy?: string;
+  referralCount?: number;
 }
 
 export interface PlatformDB {
@@ -61,7 +63,8 @@ class DatabaseService {
             avatar: 'https://ui-avatars.com/api/?name=Wahab+Fresh&background=0891b2&color=fff',
             cover: 'https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=1200&q=80',
             gender: 'men',
-            country: 'Global'
+            country: 'Global',
+            referralCount: 0
           }
         },
         platform: { 
@@ -106,9 +109,22 @@ class DatabaseService {
   }
 
   async upsertUser(user: UserDB): Promise<UserDB> {
-    this.data.users[user.email] = user;
+    // If user is brand new and has a referrer, reward them
+    const isNew = !this.data.users[user.email];
+    if (isNew && user.referredBy) {
+      const referrer = this.data.users[user.referredBy];
+      if (referrer) {
+        referrer.diamonds += 500; // Reward for inviting a friend
+        referrer.referralCount = (referrer.referralCount || 0) + 1;
+      }
+    }
+    
+    this.data.users[user.email] = {
+      ...user,
+      referralCount: user.referralCount || 0
+    };
     this.save();
-    return user;
+    return this.data.users[user.email];
   }
 
   async getPlatformRevenue(): Promise<number> {

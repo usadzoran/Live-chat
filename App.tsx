@@ -21,17 +21,30 @@ const App: React.FC = () => {
   const [user, setUser] = useState<UserDB | null>(null);
   const [currentView, setCurrentView] = useState<ViewType>('feed');
   const [platformRevenue, setPlatformRevenue] = useState<number>(0);
+  const [pendingReferrer, setPendingReferrer] = useState<string | null>(null);
 
-  // Load from Database on mount
+  // Load from Database on mount and check for referrals
   useEffect(() => {
     const init = async () => {
+      // Detect Referral Code
+      const hash = window.location.hash;
+      if (hash.includes('ref=')) {
+        try {
+          const encodedEmail = hash.split('ref=')[1];
+          const decodedEmail = atob(encodedEmail);
+          setPendingReferrer(decodedEmail);
+          console.log("Detected referrer:", decodedEmail);
+        } catch (e) {
+          console.error("Invalid referral link");
+        }
+      }
+
       const savedSession = localStorage.getItem('mydoll_active_user');
       if (savedSession) {
         const u = await db.getUser(savedSession);
         if (u) {
           setUser(u);
           setIsAuthenticated(true);
-          // Check if it's admin
           if (u.email === 'admin@mydoll.club' || u.name === 'wahabfresh') {
             setIsAdmin(true);
           }
@@ -50,7 +63,7 @@ const App: React.FC = () => {
     
     let u = await db.getUser(email);
     if (!u) {
-      // Fixed: Added missing mandatory 'album' property to satisfy UserDB interface
+      // Brand new user sign up
       u = await db.upsertUser({ 
         name, 
         email, 
@@ -58,8 +71,11 @@ const App: React.FC = () => {
         bio: isAdminUser ? "Master Node Administrator" : "Elite member",
         usd_balance: 0,
         withdrawals: [],
-        album: []
+        album: [],
+        referredBy: pendingReferrer || undefined,
+        referralCount: 0
       });
+      setPendingReferrer(null); // Clear once processed
     }
 
     if (isAdminUser || window.location.hash === '#/admin-portal') {
@@ -70,6 +86,8 @@ const App: React.FC = () => {
     setUser(u);
     setIsAuthenticated(true);
     localStorage.setItem('mydoll_active_user', email);
+    // Clean URL
+    window.location.hash = '';
   };
 
   const handleUpdateUser = async (updatedData: Partial<UserDB>) => {
@@ -88,7 +106,6 @@ const App: React.FC = () => {
     localStorage.removeItem('mydoll_active_user');
   };
 
-  // This is called after a successful "capture" from the store
   const handlePurchaseSuccess = async () => {
     if (!user) return;
     const freshUser = await db.getUser(user.email);

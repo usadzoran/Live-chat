@@ -18,7 +18,8 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
     album: user.album || [],
     dob: user.dob || '',
     gender: user.gender || 'women',
-    country: user.country || ''
+    country: user.country || '',
+    referralCount: user.referralCount || 0
   });
   
   const [isEditing, setIsEditing] = useState(false);
@@ -33,10 +34,32 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
   const [photoForm, setPhotoForm] = useState({ url: '', price: 0, caption: '' });
   const [isProcessing, setIsProcessing] = useState(false);
   const [toast, setToast] = useState<{msg: string, type: 'success' | 'error'} | null>(null);
+  const [isCopying, setIsCopying] = useState(false);
 
   const coverInputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const albumInputRef = useRef<HTMLInputElement>(null);
+
+  const referralLink = useMemo(() => {
+    return `${window.location.origin}${window.location.pathname}#/?ref=${btoa(user.email)}`;
+  }, [user.email]);
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(referralLink);
+    setIsCopying(true);
+    showToast("Referral Link Copied!", "success");
+    setTimeout(() => setIsCopying(false), 2000);
+  };
+
+  const handleShare = (platform: 'whatsapp' | 'telegram' | 'twitter') => {
+    const text = `Hey! Join me at My Doll, the elite social club. Use my invitation to get a starter bonus: ${referralLink}`;
+    const urls = {
+      whatsapp: `https://wa.me/?text=${encodeURIComponent(text)}`,
+      telegram: `https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(text)}`,
+      twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`
+    };
+    window.open(urls[platform], '_blank');
+  };
 
   const filteredAlbum = useMemo(() => {
     if (galleryFilter === 'free') return formData.album.filter(p => p.price <= 0);
@@ -79,12 +102,10 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
   const handleSavePhoto = () => {
     let updatedAlbum: AlbumPhoto[];
     if (editingPhoto) {
-      // Update existing
       updatedAlbum = formData.album.map(p => 
         p.id === editingPhoto.id ? { ...p, price: photoForm.price, caption: photoForm.caption } : p
       );
     } else {
-      // Add new
       const newPhoto: AlbumPhoto = {
         id: `photo_${Date.now()}`,
         url: photoForm.url,
@@ -183,10 +204,17 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
               {isEditing ? 'Save Changes' : 'Edit Profile'}
             </button>
           </div>
-          <div className="flex items-center gap-3 justify-center md:justify-start">
+          <div className="flex flex-wrap items-center gap-3 justify-center md:justify-start">
             <p className="text-zinc-500 text-xs italic">{formData.bio || 'Elite Member of My Doll Circle'}</p>
+            {formData.gender && (
+              <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded-md text-zinc-400 font-bold uppercase tracking-widest border border-white/5 flex items-center gap-1.5">
+                <i className={`fa-solid ${formData.gender === 'men' ? 'fa-mars text-blue-400' : formData.gender === 'women' ? 'fa-venus text-pink-400' : 'fa-genderless text-zinc-400'}`}></i>
+                {formData.gender}
+              </span>
+            )}
             {formData.country && (
-              <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded-md text-zinc-400 font-bold uppercase tracking-widest border border-white/5">
+              <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded-md text-zinc-400 font-bold uppercase tracking-widest border border-white/5 flex items-center gap-1.5">
+                <i className="fa-solid fa-earth-americas text-cyan-400"></i>
                 {formData.country}
               </span>
             )}
@@ -239,7 +267,6 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
                       <img src={photo.url} className="w-full h-full object-cover transition-transform group-hover:scale-110 duration-700" alt={photo.caption} />
                     </div>
                     
-                    {/* Hover Overlay with Controls */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-4">
                       {photo.caption && <p className="text-[10px] text-white font-bold mb-1 truncate">{photo.caption}</p>}
                       <div className="flex items-center justify-between">
@@ -273,7 +300,6 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
 
         {activeTab === 'wallet' && (
           <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {/* Balance Card */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="glass-panel p-8 rounded-[2.5rem] border-white/10 bg-gradient-to-br from-cyan-600/10 to-transparent">
                  <p className="text-[10px] font-black text-cyan-400 uppercase tracking-widest mb-3">Diamond Balance</p>
@@ -294,7 +320,6 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
               </div>
             </div>
 
-            {/* Payout History */}
             <div className="glass-panel rounded-[2.5rem] border-white/5 overflow-hidden">
                <div className="p-6 border-b border-white/5 bg-white/5">
                   <h3 className="text-xs font-black text-white uppercase tracking-widest">Withdrawal History</h3>
@@ -331,66 +356,127 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
 
         {activeTab === 'settings' && (
           <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-             <div className="glass-panel p-8 rounded-[2.5rem] border-white/10 space-y-6">
+             
+             {/* Referral Program Section */}
+             <div className="glass-panel p-8 rounded-[3rem] border-white/10 space-y-6 shadow-2xl relative overflow-hidden bg-gradient-to-br from-pink-600/10 via-transparent to-indigo-600/10">
                 <div className="flex items-center gap-4 border-b border-white/5 pb-4">
-                  <i className="fa-solid fa-gear text-pink-500 text-xl"></i>
-                  <h2 className="text-xl font-black text-white uppercase tracking-widest">Account Settings</h2>
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-400 to-yellow-600 flex items-center justify-center shadow-lg">
+                    <i className="fa-solid fa-crown text-white"></i>
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black text-white uppercase tracking-tighter">Elite Invitations</h2>
+                    <p className="text-[8px] text-zinc-500 uppercase font-black tracking-widest">Invite Friends • Earn Diamonds</p>
+                  </div>
                 </div>
 
                 <div className="space-y-6">
-                   <div className="space-y-2">
-                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Full Name</label>
-                      <input 
-                        type="text" 
-                        value={formData.name}
-                        onChange={(e) => setFormData({...formData, name: e.target.value})}
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-sm text-white focus:outline-none focus:border-pink-500/50"
-                        placeholder="Your display name"
-                      />
-                   </div>
+                   <div className="p-6 bg-black/40 border border-white/5 rounded-2xl space-y-4">
+                      <p className="text-xs text-zinc-400 leading-relaxed font-bold italic">
+                        Share your unique elite link. For every friend who joins the circle, you receive <span className="text-pink-500">500 Diamonds</span>.
+                      </p>
+                      
+                      <div className="relative group">
+                        <input 
+                          type="text" 
+                          readOnly
+                          value={referralLink}
+                          className="w-full bg-zinc-950 border border-white/10 rounded-xl py-4 pl-4 pr-32 text-[10px] text-zinc-500 font-mono focus:outline-none"
+                        />
+                        <button 
+                          onClick={handleCopyLink}
+                          className={`absolute right-2 top-2 bottom-2 px-6 rounded-lg font-black text-[9px] uppercase tracking-widest transition-all ${isCopying ? 'bg-green-600 text-white' : 'bg-pink-600 text-white hover:bg-pink-500'}`}
+                        >
+                          {isCopying ? 'Copied!' : 'Copy Link'}
+                        </button>
+                      </div>
 
+                      <div className="flex items-center justify-between gap-4 pt-2">
+                        <div className="flex gap-3">
+                           <button onClick={() => handleShare('whatsapp')} className="w-10 h-10 rounded-xl bg-green-600/10 text-green-500 flex items-center justify-center hover:bg-green-600 hover:text-white transition-all"><i className="fa-brands fa-whatsapp"></i></button>
+                           <button onClick={() => handleShare('telegram')} className="w-10 h-10 rounded-xl bg-blue-600/10 text-blue-400 flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all"><i className="fa-brands fa-telegram"></i></button>
+                           <button onClick={() => handleShare('twitter')} className="w-10 h-10 rounded-xl bg-white/5 text-zinc-400 flex items-center justify-center hover:bg-white hover:text-black transition-all"><i className="fa-brands fa-x-twitter"></i></button>
+                        </div>
+                        <div className="text-right">
+                           <p className="text-[8px] text-zinc-600 uppercase font-black tracking-widest">Successful Invites</p>
+                           <p className="text-lg font-black text-white">{formData.referralCount}</p>
+                        </div>
+                      </div>
+                   </div>
+                </div>
+             </div>
+
+             <div className="glass-panel p-8 rounded-[3rem] border-white/10 space-y-8 shadow-2xl">
+                <div className="flex items-center gap-4 border-b border-white/5 pb-4">
+                  <div className="w-10 h-10 rounded-xl bg-pink-600/10 flex items-center justify-center">
+                    <i className="fa-solid fa-user-gear text-pink-500"></i>
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black text-white uppercase tracking-tighter">Profile Settings</h2>
+                    <p className="text-[8px] text-zinc-500 uppercase font-black tracking-widest">Identity & Preferences</p>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Full Display Name</label>
+                        <input 
+                          type="text" 
+                          value={formData.name}
+                          onChange={(e) => setFormData({...formData, name: e.target.value})}
+                          placeholder="Elite Name"
+                          className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 px-6 text-xs text-white focus:outline-none focus:border-pink-500/50 transition-all"
+                        />
+                      </div>
                       <div className="space-y-2">
                         <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Date of Birth</label>
                         <input 
                           type="date" 
                           value={formData.dob}
                           onChange={(e) => setFormData({...formData, dob: e.target.value})}
-                          className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-sm text-white focus:outline-none focus:border-pink-500/50"
+                          className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 px-6 text-xs text-white focus:outline-none focus:border-pink-500/50 transition-all"
                         />
                       </div>
+                   </div>
+
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
                         <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Gender</label>
-                        <select 
-                          value={formData.gender}
-                          onChange={(e) => setFormData({...formData, gender: e.target.value as any})}
-                          className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-sm text-white focus:outline-none focus:border-pink-500/50 appearance-none"
-                        >
-                          <option value="women">Women</option>
-                          <option value="men">Men</option>
-                          <option value="other">Other</option>
-                        </select>
+                        <div className="relative group">
+                          <select 
+                            value={formData.gender}
+                            onChange={(e) => setFormData({...formData, gender: e.target.value as any})}
+                            className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 px-6 text-xs text-white focus:outline-none focus:border-pink-500/50 transition-all appearance-none cursor-pointer"
+                          >
+                            <option value="women">Women</option>
+                            <option value="men">Men</option>
+                            <option value="other">Other</option>
+                          </select>
+                          <i className="fa-solid fa-chevron-down absolute right-6 top-1/2 -translate-y-1/2 text-zinc-600 pointer-events-none group-focus-within:rotate-180 transition-transform"></i>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Country</label>
+                        <div className="relative">
+                          <i className="fa-solid fa-globe absolute left-6 top-1/2 -translate-y-1/2 text-zinc-600 text-xs"></i>
+                          <input 
+                            type="text" 
+                            value={formData.country}
+                            onChange={(e) => setFormData({...formData, country: e.target.value})}
+                            placeholder="e.g. Monaco"
+                            className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 pl-12 pr-6 text-xs text-white focus:outline-none focus:border-pink-500/50 transition-all"
+                          />
+                        </div>
                       </div>
                    </div>
 
                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Country</label>
-                      <input 
-                        type="text" 
-                        value={formData.country}
-                        onChange={(e) => setFormData({...formData, country: e.target.value})}
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-sm text-white focus:outline-none focus:border-pink-500/50"
-                        placeholder="e.g. United States"
-                      />
-                   </div>
-
-                   <div className="space-y-2">
-                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Bio / Status</label>
+                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">About Me (Bio)</label>
                       <textarea 
                         value={formData.bio}
                         onChange={(e) => setFormData({...formData, bio: e.target.value})}
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-sm text-white focus:outline-none focus:border-pink-500/50 h-32 resize-none"
-                        placeholder="Write something about yourself..."
+                        placeholder="Share your lifestyle and interests..."
+                        className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 px-6 text-xs text-white focus:outline-none focus:border-pink-500/50 transition-all h-32 resize-none"
                       />
                    </div>
                 </div>
@@ -398,9 +484,10 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
                 <div className="pt-4">
                   <button 
                     onClick={handleSaveProfile}
-                    className="w-full py-5 bg-pink-600 text-white font-black text-xs uppercase tracking-widest rounded-[2rem] shadow-2xl shadow-pink-600/20 active:scale-95 transition-all"
+                    className="w-full py-5 bg-pink-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-2xl shadow-pink-600/40 active:scale-95 transition-all flex items-center justify-center gap-3"
                   >
-                    Update Profile Details
+                    <i className="fa-solid fa-cloud-arrow-up"></i>
+                    Sync Profile Details
                   </button>
                 </div>
              </div>
