@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 interface StoreViewProps {
   diamonds: number;
@@ -21,6 +21,7 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
   const [paymentMethod, setPaymentMethod] = useState<'visa' | 'paypal' | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const paypalContainerRef = useRef<HTMLDivElement>(null);
 
   const handleBuy = (pack: typeof DIAMOND_PACKS[0]) => {
     setSelectedPack(pack);
@@ -29,8 +30,14 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
 
   const confirmPurchase = () => {
     if (!selectedPack || !paymentMethod) return;
+    
+    if (paymentMethod === 'paypal') {
+        // PayPal button handles its own flow once rendered
+        return;
+    }
+
     setIsProcessing(true);
-    // Simulate payment processing
+    // Simulate Visa payment processing
     setTimeout(() => {
       onPurchase(selectedPack.amount);
       setIsProcessing(false);
@@ -40,6 +47,24 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
       setPaymentMethod(null);
     }, 2000);
   };
+
+  useEffect(() => {
+    if (paymentMethod === 'paypal' && selectedPack && paypalContainerRef.current) {
+      // Clean up previous renders if any
+      paypalContainerRef.current.innerHTML = '';
+      
+      // Check if PayPal SDK is available
+      if ((window as any).paypal) {
+        (window as any).paypal.HostedButtons({
+          hostedButtonId: "MUH345U2QKVG8", // Using the ID provided by user
+        }).render(`#${paypalContainerRef.current.id}`).catch((err: any) => {
+            console.error("PayPal button rendering failed", err);
+        });
+      } else {
+        console.error("PayPal SDK not found");
+      }
+    }
+  }, [paymentMethod, selectedPack]);
 
   return (
     <div className="max-w-4xl mx-auto h-full flex flex-col gap-6 overflow-y-auto pb-32 hide-scrollbar">
@@ -117,7 +142,7 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
           <div className="w-full max-w-md glass-panel p-8 rounded-[3rem] border-white/10 shadow-2xl space-y-6 relative overflow-hidden text-center">
             <div className="absolute top-6 right-6">
               <button onClick={() => setSelectedPack(null)} className="text-zinc-600 hover:text-white">
-                 <i className="fa-solid fa-xmark"></i>
+                 <i className="fa-solid fa-xmark text-lg"></i>
               </button>
             </div>
             
@@ -167,26 +192,39 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
                   <input type="text" placeholder="MM/YY" className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-xs text-white focus:outline-none focus:border-indigo-500" />
                   <input type="text" placeholder="CVC" className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-xs text-white focus:outline-none focus:border-indigo-500" />
                 </div>
+                <button 
+                  onClick={confirmPurchase}
+                  disabled={isProcessing}
+                  className={`w-full py-5 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-2xl transition-all active:scale-95 bg-pink-600 shadow-pink-600/40`}
+                >
+                  {isProcessing ? (
+                    <i className="fa-solid fa-circle-notch animate-spin"></i>
+                  ) : (
+                    `PAY $${selectedPack.price.toFixed(2)}`
+                  )}
+                </button>
               </div>
             )}
 
             {paymentMethod === 'paypal' && (
-              <div className="p-4 bg-blue-600/10 border border-blue-500/20 rounded-2xl text-center animate-in slide-in-from-top-2">
-                <p className="text-[10px] text-blue-300 font-bold">Secure redirection to PayPal authorized portal...</p>
+              <div className="space-y-4 animate-in slide-in-from-top-2">
+                <div className="p-6 bg-blue-600/10 border border-blue-500/20 rounded-2xl text-center min-h-[120px] flex items-center justify-center">
+                    <div id="paypal-container-MUH345U2QKVG8" ref={paypalContainerRef} className="w-full flex justify-center">
+                        <div className="animate-pulse flex flex-col items-center gap-2">
+                            <i className="fa-brands fa-paypal text-2xl text-blue-400"></i>
+                            <span className="text-[10px] text-blue-300 font-bold">Initializing Secure Checkout...</span>
+                        </div>
+                    </div>
+                </div>
+                <p className="text-[8px] text-zinc-500 uppercase tracking-widest">Diamonds credited instantly after PayPal confirmation</p>
               </div>
             )}
 
-            <button 
-              onClick={confirmPurchase}
-              disabled={isProcessing || !paymentMethod}
-              className={`w-full py-5 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-2xl transition-all active:scale-95 ${!paymentMethod ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed' : 'bg-pink-600 shadow-pink-600/40'}`}
-            >
-              {isProcessing ? (
-                <i className="fa-solid fa-circle-notch animate-spin"></i>
-              ) : (
-                `CONFIRM & PAY $${selectedPack.price.toFixed(2)}`
-              )}
-            </button>
+            {!paymentMethod && (
+               <div className="py-8 text-zinc-600 italic text-xs">
+                 Please select a provider to continue
+               </div>
+            )}
           </div>
         </div>
       )}

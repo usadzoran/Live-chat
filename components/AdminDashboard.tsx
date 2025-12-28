@@ -16,6 +16,7 @@ const AdminDashboard: React.FC = () => {
   // Treasury Configuration State
   const [merchantConfig, setMerchantConfig] = useState({
     paypalEmail: 'admin@mydoll.club',
+    paypalButtonId: 'MUH345U2QKVG8',
     visaMerchantId: 'MID-8842-990-X',
     gatewayProvider: 'Stripe Connect',
     isLiveMode: false,
@@ -244,27 +245,38 @@ const AdminDashboard: React.FC = () => {
                           <i className="fa-brands fa-paypal"></i>
                        </div>
                        <div>
-                          <h3 className="text-sm font-black text-white uppercase tracking-widest">PayPal Merchant</h3>
-                          <p className="text-[8px] text-zinc-600 font-bold uppercase tracking-widest">Configure direct receiver email</p>
+                          <h3 className="text-sm font-black text-white uppercase tracking-widest">PayPal Hosted Button</h3>
+                          <p className="text-[8px] text-zinc-600 font-bold uppercase tracking-widest">Configured via PayPal Merchant Dashboard</p>
                        </div>
                     </div>
 
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Platform Receiver Email</label>
-                       <input 
-                        type="email"
-                        value={merchantConfig.paypalEmail}
-                        onChange={(e) => setMerchantConfig({ ...merchantConfig, paypalEmail: e.target.value })}
-                        className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 px-6 text-sm text-white focus:outline-none focus:border-blue-500 transition-all"
-                       />
+                    <div className="space-y-4">
+                       <div className="space-y-2">
+                          <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Platform Receiver Email</label>
+                          <input 
+                            type="email"
+                            value={merchantConfig.paypalEmail}
+                            onChange={(e) => setMerchantConfig({ ...merchantConfig, paypalEmail: e.target.value })}
+                            className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 px-6 text-sm text-white focus:outline-none focus:border-blue-500 transition-all"
+                          />
+                       </div>
+                       <div className="space-y-2">
+                          <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Hosted Button ID</label>
+                          <input 
+                            type="text"
+                            value={merchantConfig.paypalButtonId}
+                            onChange={(e) => setMerchantConfig({ ...merchantConfig, paypalButtonId: e.target.value })}
+                            className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 px-6 text-sm text-white focus:outline-none focus:border-blue-500 transition-all font-mono"
+                          />
+                       </div>
                     </div>
 
                     <div className="p-4 bg-white/5 rounded-2xl border border-white/5 flex items-center justify-between">
                        <div className="flex items-center gap-3">
                           <i className="fa-solid fa-circle-check text-green-500 text-[10px]"></i>
-                          <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">API Status</span>
+                          <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">PayPal API Status</span>
                        </div>
-                       <span className="text-[10px] font-black text-green-500 uppercase tracking-widest">Connected</span>
+                       <span className="text-[10px] font-black text-green-500 uppercase tracking-widest">Active</span>
                     </div>
                  </div>
 
