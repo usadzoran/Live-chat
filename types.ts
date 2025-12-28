@@ -5,6 +5,15 @@ export enum StreamStatus {
   LIVE = 'LIVE'
 }
 
+export interface AdConfig {
+  id: string;
+  placement: 'under_header' | 'before_publication' | 'under_publication' | 'footer';
+  enabled: boolean;
+  title: string;
+  imageUrl: string;
+  link: string;
+}
+
 export interface ChatMessage {
   id: string;
   sender: 'user' | 'gemini';

@@ -1,12 +1,19 @@
 
 import React, { useState } from 'react';
-import { Publication, Comment } from '../types';
+import { Publication, Comment, AdConfig } from '../types';
 
 interface FeedPageProps {
   user: { name: string; avatar?: string };
 }
 
 const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
+  // Simulating Ad configuration that would come from global state/backend
+  const [adConfig] = useState<AdConfig[]>([
+    { id: '1', placement: 'under_header', enabled: true, title: 'Luxury Watches', imageUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=400&q=80', link: '#' },
+    { id: '2', placement: 'before_publication', enabled: true, title: 'Elite Membership', imageUrl: '', link: '#' },
+    { id: '3', placement: 'under_publication', enabled: true, title: 'Diamond Gifting', imageUrl: 'https://images.unsplash.com/photo-1588444833098-4205565e2482?auto=format&fit=crop&w=400&q=80', link: '#' },
+  ]);
+
   const [publications, setPublications] = useState<Publication[]>([
     {
       id: '1',
@@ -46,7 +53,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
       user: user.name,
       userAvatar: `https://ui-avatars.com/api/?name=${user.name}&background=6366f1&color=fff`,
       type: selectedType,
-      content: selectedType === 'text' ? newPostText : 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=800&q=80', // Simulating upload
+      content: selectedType === 'text' ? newPostText : 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=800&q=80',
       description: selectedType !== 'text' ? newPostText : undefined,
       likes: 0,
       dislikes: 0,
@@ -87,60 +94,99 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
     }));
   };
 
+  const renderAd = (placement: AdConfig['placement']) => {
+    const ad = adConfig.find(a => a.placement === placement && a.enabled);
+    if (!ad) return null;
+
+    return (
+      <div className="glass-panel p-4 lg:p-6 rounded-3xl border border-cyan-500/10 shadow-[0_0_20px_rgba(8,145,178,0.05)] flex items-center gap-4 group transition-all hover:border-cyan-500/30 mb-6 last:mb-0">
+        <div className="shrink-0 w-16 h-16 lg:w-20 lg:h-20 rounded-2xl bg-zinc-900 overflow-hidden border border-white/5">
+           {ad.imageUrl ? (
+              <img src={ad.imageUrl} className="w-full h-full object-cover transition-transform group-hover:scale-110" alt="ad" />
+           ) : (
+              <div className="w-full h-full flex items-center justify-center text-zinc-700">
+                 <i className="fa-solid fa-rectangle-ad text-2xl"></i>
+              </div>
+           )}
+        </div>
+        <div className="flex-1">
+           <div className="flex items-center gap-2 mb-1">
+              <span className="text-[7px] lg:text-[8px] font-black text-cyan-400 uppercase tracking-widest border border-cyan-400/30 px-1.5 py-0.5 rounded bg-cyan-400/5">SPONSORED</span>
+              <h4 className="text-[10px] lg:text-xs font-black text-white uppercase tracking-tight">{ad.title}</h4>
+           </div>
+           <p className="text-[9px] lg:text-[10px] text-zinc-500 line-clamp-2">Experience the luxury of {ad.title}. Exclusive for My Doll Elite members.</p>
+           <a href={ad.link} className="inline-flex items-center gap-2 mt-2 text-[8px] lg:text-[9px] font-black text-cyan-500 uppercase tracking-widest hover:text-cyan-400">
+              Explore Now <i className="fa-solid fa-arrow-right"></i>
+           </a>
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="max-w-2xl mx-auto h-full flex flex-col gap-6 overflow-y-auto pb-12 hide-scrollbar px-2">
+    <div className="max-w-3xl mx-auto h-full flex flex-col gap-4 lg:gap-8 overflow-y-auto pb-24 lg:pb-32 hide-scrollbar px-2">
+      
+      {/* Placement: Under Header */}
+      {renderAd('under_header')}
+
       {/* Create Publication */}
-      <div className="glass-panel p-6 rounded-[2rem] border-white/5">
+      <div className="glass-panel p-4 lg:p-8 rounded-[2rem] lg:rounded-[2.5rem] border-white/5 shadow-xl">
         <div className="flex gap-4 mb-4">
-          <img src={`https://ui-avatars.com/api/?name=${user.name}&background=6366f1&color=fff`} className="w-12 h-12 rounded-xl" alt="avatar" />
+          <img src={`https://ui-avatars.com/api/?name=${user.name}&background=6366f1&color=fff`} className="w-10 h-10 lg:w-12 lg:h-12 rounded-xl" alt="avatar" />
           <textarea
-            className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-4 text-sm text-white focus:outline-none focus:border-indigo-500/50 resize-none"
+            className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-4 text-sm text-white focus:outline-none focus:border-indigo-500/50 resize-none transition-all"
             placeholder="Share your talent or thoughts..."
             rows={2}
             value={newPostText}
             onChange={(e) => setNewPostText(e.target.value)}
           />
         </div>
-        <div className="flex items-center justify-between border-t border-white/5 pt-4">
-          <div className="flex gap-3">
-            <button 
-              onClick={() => setSelectedType('text')}
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${selectedType === 'text' ? 'bg-indigo-600 text-white' : 'bg-white/5 text-zinc-500 hover:bg-white/10'}`}
-            >
-              <i className="fa-solid fa-font"></i> Text
-            </button>
-            <button 
-              onClick={() => setSelectedType('image')}
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${selectedType === 'image' ? 'bg-indigo-600 text-white' : 'bg-white/5 text-zinc-500 hover:bg-white/10'}`}
-            >
-              <i className="fa-solid fa-image"></i> Photo
-            </button>
-            <button 
-              onClick={() => setSelectedType('video')}
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${selectedType === 'video' ? 'bg-indigo-600 text-white' : 'bg-white/5 text-zinc-500 hover:bg-white/10'}`}
-            >
-              <i className="fa-solid fa-film"></i> Short (8s)
-            </button>
+        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-white/5 pt-4">
+          <div className="flex gap-2 lg:gap-3">
+            {[
+              { id: 'text', icon: 'fa-font', label: 'Text' },
+              { id: 'image', icon: 'fa-image', label: 'Photo' },
+              { id: 'video', icon: 'fa-film', label: 'Short' }
+            ].map((type) => (
+              <button 
+                key={type.id}
+                onClick={() => setSelectedType(type.id as any)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all ${selectedType === type.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'bg-white/5 text-zinc-500 hover:bg-white/10'}`}
+              >
+                <i className={`fa-solid ${type.icon}`}></i> {type.label}
+              </button>
+            ))}
           </div>
           <button 
             onClick={handlePost}
-            className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-indigo-600/20"
+            className="px-8 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-xl shadow-indigo-600/30 ml-auto sm:ml-0"
           >
             PUBLISH
           </button>
         </div>
       </div>
 
+      {/* Placement: Before Publication */}
+      {renderAd('before_publication')}
+
       {/* Publications List */}
-      <div className="space-y-6">
-        {publications.map((pub) => (
-          <PublicationCard 
-            key={pub.id} 
-            pub={pub} 
-            onInteraction={handleInteraction} 
-            onComment={addComment}
-          />
+      <div className="space-y-6 lg:space-y-10">
+        {publications.map((pub, idx) => (
+          <React.Fragment key={pub.id}>
+            <PublicationCard 
+              pub={pub} 
+              onInteraction={handleInteraction} 
+              onComment={addComment}
+            />
+            {/* Placement: Under Publication (Inserted after the first post) */}
+            {idx === 0 && renderAd('under_publication')}
+          </React.Fragment>
         ))}
+      </div>
+
+      {/* Placement: Footer */}
+      <div className="pt-8 opacity-50">
+        {renderAd('footer')}
       </div>
     </div>
   );
@@ -157,100 +203,104 @@ const PublicationCard: React.FC<PublicationCardProps> = ({ pub, onInteraction, o
   const [showComments, setShowComments] = useState(false);
 
   return (
-    <div className="glass-panel rounded-[2rem] border-white/5 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="p-6">
-        <div className="flex items-center justify-between mb-4">
+    <div className="glass-panel rounded-[2rem] lg:rounded-[2.5rem] border-white/5 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500 shadow-2xl">
+      <div className="p-5 lg:p-8">
+        <div className="flex items-center justify-between mb-4 lg:mb-6">
           <div className="flex items-center gap-3">
-            <img src={pub.userAvatar} className="w-10 h-10 rounded-xl" alt="avatar" />
+            <img src={pub.userAvatar} className="w-9 h-9 lg:w-11 lg:h-11 rounded-xl" alt="avatar" />
             <div>
-              <p className="text-sm font-bold text-white">{pub.user}</p>
-              <p className="text-[10px] text-zinc-500">{pub.timestamp.toLocaleDateString()} • {pub.type.toUpperCase()}</p>
+              <p className="text-sm font-bold text-white leading-none mb-1">{pub.user}</p>
+              <p className="text-[9px] lg:text-[10px] text-zinc-600 font-bold uppercase tracking-widest">
+                {pub.timestamp.toLocaleDateString()} • {pub.type}
+              </p>
             </div>
           </div>
-          <button className="text-zinc-600 hover:text-white transition-colors">
-            <i className="fa-solid fa-ellipsis-vertical"></i>
+          <button className="w-8 h-8 rounded-lg hover:bg-white/5 text-zinc-600 hover:text-white transition-all">
+            <i className="fa-solid fa-ellipsis-vertical text-xs"></i>
           </button>
         </div>
 
         {pub.type === 'text' ? (
-          <p className="text-sm text-zinc-300 leading-relaxed mb-4">{pub.content}</p>
+          <p className="text-sm lg:text-base text-zinc-300 leading-relaxed mb-4 lg:mb-6">{pub.content}</p>
         ) : pub.type === 'image' ? (
-          <div className="space-y-4">
-             {pub.description && <p className="text-sm text-zinc-300 mb-2">{pub.description}</p>}
-             <div className="rounded-2xl overflow-hidden border border-white/5">
-                <img src={pub.content} className="w-full h-auto object-cover max-h-96" alt="post content" />
+          <div className="space-y-4 lg:space-y-6">
+             {pub.description && <p className="text-sm text-zinc-300">{pub.description}</p>}
+             <div className="rounded-2xl lg:rounded-3xl overflow-hidden border border-white/5 bg-zinc-900">
+                <img src={pub.content} className="w-full h-auto object-cover max-h-[500px]" alt="post content" />
              </div>
           </div>
         ) : (
-          <div className="space-y-4">
-             {pub.description && <p className="text-sm text-zinc-300 mb-2">{pub.description}</p>}
-             <div className="rounded-2xl overflow-hidden border border-white/5 relative aspect-video bg-black flex items-center justify-center">
-                <div className="absolute top-4 left-4 z-10 px-2 py-1 bg-red-600 text-[8px] font-black text-white rounded-md uppercase tracking-widest">Short (8s)</div>
-                <i className="fa-solid fa-play text-4xl text-white opacity-40"></i>
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+          <div className="space-y-4 lg:space-y-6">
+             {pub.description && <p className="text-sm text-zinc-300">{pub.description}</p>}
+             <div className="rounded-2xl lg:rounded-3xl overflow-hidden border border-white/5 relative aspect-video bg-black flex items-center justify-center group cursor-pointer">
+                <div className="absolute top-4 left-4 z-10 px-2.5 py-1 bg-red-600 text-[8px] font-black text-white rounded-md uppercase tracking-widest shadow-lg">Short (8s)</div>
+                <div className="w-16 h-16 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white scale-100 group-hover:scale-110 transition-transform">
+                  <i className="fa-solid fa-play text-2xl ml-1"></i>
+                </div>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
              </div>
           </div>
         )}
 
-        <div className="flex items-center justify-between mt-6 pt-4 border-t border-white/5">
-          <div className="flex gap-4">
+        <div className="flex items-center justify-between mt-6 lg:mt-8 pt-4 border-t border-white/5">
+          <div className="flex gap-2 lg:gap-6">
             <button 
               onClick={() => onInteraction(pub.id, 'like')}
               className="flex items-center gap-2 text-zinc-500 hover:text-indigo-400 transition-colors group"
             >
-              <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-indigo-500/10">
+              <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center group-hover:bg-indigo-500/10">
                 <i className="fa-solid fa-heart text-xs"></i>
               </div>
-              <span className="text-xs font-bold">{pub.likes}</span>
+              <span className="text-[10px] lg:text-xs font-black">{pub.likes}</span>
             </button>
             <button 
               onClick={() => onInteraction(pub.id, 'dislike')}
               className="flex items-center gap-2 text-zinc-500 hover:text-red-400 transition-colors group"
             >
-              <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-red-500/10">
+              <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center group-hover:bg-red-500/10">
                 <i className="fa-solid fa-thumbs-down text-xs"></i>
               </div>
-              <span className="text-xs font-bold">{pub.dislikes}</span>
+              <span className="text-[10px] lg:text-xs font-black">{pub.dislikes}</span>
             </button>
             <button 
               onClick={() => setShowComments(!showComments)}
               className={`flex items-center gap-2 transition-colors group ${showComments ? 'text-indigo-400' : 'text-zinc-500 hover:text-indigo-400'}`}
             >
-              <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-indigo-500/10">
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${showComments ? 'bg-indigo-500/10' : 'bg-white/5'} group-hover:bg-indigo-500/10`}>
                 <i className="fa-solid fa-comment text-xs"></i>
               </div>
-              <span className="text-xs font-bold">{pub.comments.length}</span>
+              <span className="text-[10px] lg:text-xs font-black">{pub.comments.length}</span>
             </button>
           </div>
-          <button className="text-zinc-600 hover:text-white transition-colors">
-            <i className="fa-solid fa-share-nodes"></i>
+          <button className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-zinc-600 hover:text-white transition-all">
+            <i className="fa-solid fa-share-nodes text-xs"></i>
           </button>
         </div>
       </div>
 
       {showComments && (
-        <div className="bg-white/5 p-6 border-t border-white/10 space-y-4 animate-in slide-in-from-top-2 duration-300">
-          <div className="space-y-4 max-h-60 overflow-y-auto hide-scrollbar">
+        <div className="bg-white/5 p-5 lg:p-8 border-t border-white/10 space-y-4 animate-in slide-in-from-top-2 duration-300">
+          <div className="space-y-4 max-h-72 overflow-y-auto hide-scrollbar">
             {pub.comments.length > 0 ? pub.comments.map(c => (
               <div key={c.id} className="flex gap-3">
                 <img src={`https://ui-avatars.com/api/?name=${c.user}&background=3f3f46&color=fff`} className="w-8 h-8 rounded-lg shrink-0" alt="avatar" />
                 <div className="flex-1 bg-zinc-900/50 rounded-2xl p-3 border border-white/5">
                    <div className="flex items-center justify-between mb-1">
                       <p className="text-[10px] font-bold text-white">{c.user}</p>
-                      <p className="text-[8px] text-zinc-600">{new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                      <p className="text-[8px] text-zinc-600 uppercase font-bold">{new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                    </div>
-                   <p className="text-xs text-zinc-400">{c.text}</p>
+                   <p className="text-xs text-zinc-400 leading-relaxed">{c.text}</p>
                 </div>
               </div>
             )) : (
-              <p className="text-[10px] text-zinc-600 italic text-center py-4">Be the first to comment!</p>
+              <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest text-center py-6 opacity-40">Be the first to leave a mark</p>
             )}
           </div>
-          <div className="flex gap-3 pt-2">
+          <div className="flex gap-3 pt-4 border-t border-white/5">
             <input 
               type="text" 
               placeholder="Add a comment..."
-              className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-xs text-white focus:outline-none focus:border-indigo-500/50"
+              className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500/50 transition-colors"
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}
               onKeyDown={(e) => {
@@ -265,7 +315,7 @@ const PublicationCard: React.FC<PublicationCardProps> = ({ pub, onInteraction, o
                 onComment(pub.id, commentText);
                 setCommentText('');
               }}
-              className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white"
+              className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-600/20 hover:scale-105 active:scale-95 transition-all"
             >
               <i className="fa-solid fa-paper-plane text-[10px]"></i>
             </button>

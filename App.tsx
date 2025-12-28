@@ -106,7 +106,7 @@ const App: React.FC = () => {
       />
       
       <main className="flex-1 overflow-hidden relative">
-        <div className={`absolute inset-0 ${currentView === 'admin' ? 'p-0' : 'p-3 pb-24 md:p-6 md:pb-6'} overflow-hidden`}>
+        <div className={`absolute inset-0 ${currentView === 'admin' ? 'p-0' : 'p-3 pb-24 md:p-6 md:pb-8 lg:p-8 lg:pb-12'} overflow-hidden`}>
           {renderContent()}
         </div>
       </main>
