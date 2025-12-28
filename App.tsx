@@ -25,6 +25,14 @@ const AppContent: React.FC = () => {
   const [pendingReferrer, setPendingReferrer] = useState<string | null>(null);
 
   useEffect(() => {
+    const handleHashChange = () => {
+      if (window.location.hash === '#/admin-portal') {
+        setShowAuth(true);
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+
     const init = async () => {
       const hash = window.location.hash;
       if (hash.includes('ref=')) {
@@ -35,6 +43,10 @@ const AppContent: React.FC = () => {
         } catch (e) {
           console.error("Invalid referral link");
         }
+      }
+
+      if (hash === '#/admin-portal') {
+        setShowAuth(true);
       }
 
       const savedSession = localStorage.getItem('mydoll_active_user');
@@ -51,7 +63,9 @@ const AppContent: React.FC = () => {
       const rev = await db.getPlatformRevenue();
       setPlatformRevenue(rev);
     };
+
     init();
+    return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
   const handleLogin = async (name: string, email: string, password?: string) => {

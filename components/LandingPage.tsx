@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from '../contexts/LanguageContext';
 
 interface LandingPageProps {
@@ -8,6 +8,27 @@ interface LandingPageProps {
 
 const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
   const { t, isRTL } = useTranslation();
+  const [clickCount, setClickCount] = useState(0);
+  const [showOverride, setShowOverride] = useState(false);
+
+  // Reset click count after 2 seconds of inactivity
+  useEffect(() => {
+    const timer = setTimeout(() => setClickCount(0), 2000);
+    return () => clearTimeout(timer);
+  }, [clickCount]);
+
+  const handleLogoClick = () => {
+    const newCount = clickCount + 1;
+    setClickCount(newCount);
+    
+    if (newCount === 5) {
+      setShowOverride(true);
+      setTimeout(() => {
+        window.location.hash = '#/admin-portal';
+        onGetStarted();
+      }, 1000);
+    }
+  };
 
   return (
     <div className="min-h-[100dvh] w-full bg-zinc-950 flex flex-col relative overflow-hidden text-white">
@@ -22,15 +43,38 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
         <div className={`absolute inset-0 bg-gradient-to-${isRTL ? 'l' : 'r'} from-zinc-950 via-transparent to-transparent`}></div>
       </div>
 
+      {/* Secret Override Overlay */}
+      {showOverride && (
+        <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center font-mono">
+           <div className="text-cyan-500 animate-pulse text-xl font-black mb-4">
+             [ SYSTEM OVERRIDE ]
+           </div>
+           <div className="w-64 h-1 bg-zinc-900 rounded-full overflow-hidden">
+             <div className="h-full bg-cyan-500 animate-[move-gradient_1s_ease_infinite] w-full"></div>
+           </div>
+           <p className="mt-4 text-[10px] text-cyan-800 uppercase tracking-[0.5em]">Initializing Admin Protocol...</p>
+        </div>
+      )}
+
       <nav className="absolute top-0 w-full h-20 flex items-center justify-between px-6 z-50">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl stream-gradient flex items-center justify-center shadow-2xl">
-            <i className="fa-solid fa-face-grin-stars text-white text-xl"></i>
+        <div 
+          className="flex items-center gap-3 cursor-pointer select-none group"
+          onClick={handleLogoClick}
+        >
+          <div className={`w-10 h-10 rounded-xl stream-gradient flex items-center justify-center shadow-2xl transition-all duration-300 ${clickCount > 0 ? 'scale-110 shadow-cyan-500/50' : 'group-hover:scale-105'}`}>
+            <i className={`fa-solid fa-face-grin-stars text-white text-xl ${clickCount > 0 ? 'text-cyan-200' : ''}`}></i>
           </div>
           <div className="flex flex-col">
             <h1 className="text-lg font-black tracking-tighter leading-none">My Doll</h1>
             <p className="text-[8px] text-pink-500 uppercase tracking-widest font-black">Elite Circle</p>
           </div>
+          {clickCount > 0 && (
+            <div className="ml-4 flex gap-1">
+              {Array.from({ length: clickCount }).map((_, i) => (
+                <div key={i} className="w-1 h-1 bg-cyan-500 rounded-full animate-ping"></div>
+              ))}
+            </div>
+          )}
         </div>
         <button 
           onClick={onGetStarted}
