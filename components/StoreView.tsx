@@ -24,75 +24,80 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
   const paypalContainerRef = useRef<HTMLDivElement>(null);
   const selectedPackRef = useRef<typeof DIAMOND_PACKS[0] | null>(null);
 
-  // Keep a ref to the selected pack so the PayPal callback can access the latest value
+  // Sync ref with state for the PayPal callback
   useEffect(() => {
     selectedPackRef.current = selectedPack;
   }, [selectedPack]);
 
   const handleBuy = (pack: typeof DIAMOND_PACKS[0]) => {
     setSelectedPack(pack);
-    setPaymentMethod(null); // Reset payment method on new selection
+    setPaymentMethod(null);
   };
 
-  const confirmPurchase = () => {
-    if (!selectedPack || !paymentMethod) return;
-    
-    if (paymentMethod === 'paypal') {
-        // PayPal button renders and handles its own flow
-        return;
-    }
-
+  const confirmVisaPurchase = () => {
+    if (!selectedPack) return;
     setIsProcessing(true);
-    // Simulate Visa payment processing
+    // Simulate card processing
     setTimeout(() => {
       onPurchase(selectedPack.amount);
       setIsProcessing(false);
       setShowSuccess(true);
-      setTimeout(() => setShowSuccess(false), 3000);
+      setTimeout(() => setShowSuccess(false), 4000);
       setSelectedPack(null);
       setPaymentMethod(null);
     }, 2000);
   };
 
   useEffect(() => {
+    let paypalButton: any = null;
+
     if (paymentMethod === 'paypal' && selectedPack && paypalContainerRef.current) {
-      // Clean up previous renders if any
+      const containerId = paypalContainerRef.current.id;
+      // Clear container before rendering
       paypalContainerRef.current.innerHTML = '';
       
       const pp = (window as any).paypal;
       if (pp && pp.HostedButtons) {
-        pp.HostedButtons({
-          hostedButtonId: "MUH345U2QKVG8",
-          // The onApprove callback is triggered when the user successfully pays
-          onApprove: (data: any, actions: any) => {
-            console.log("PayPal Payment Approved:", data);
-            const pack = selectedPackRef.current;
-            if (pack) {
-              onPurchase(pack.amount);
-              setShowSuccess(true);
-              setTimeout(() => setShowSuccess(false), 4000);
-              setSelectedPack(null);
-              setPaymentMethod(null);
+        try {
+          paypalButton = pp.HostedButtons({
+            hostedButtonId: "MUH345U2QKVG8",
+            onApprove: (data: any, actions: any) => {
+              console.log("Transaction Approved:", data);
+              const pack = selectedPackRef.current;
+              if (pack) {
+                // AUTOMATIC CREDIT: The onPurchase callback updates the global state in App.tsx
+                onPurchase(pack.amount);
+                setShowSuccess(true);
+                setTimeout(() => setShowSuccess(false), 5000);
+                setSelectedPack(null);
+                setPaymentMethod(null);
+              }
+            },
+            onCancel: () => {
+              console.log("Transaction Cancelled");
+            },
+            onError: (err: any) => {
+              console.error("PayPal Execution Error:", err);
             }
-          },
-          onCancel: () => {
-            console.log("PayPal Payment Cancelled");
-          },
-          onError: (err: any) => {
-            console.error("PayPal Error:", err);
-          }
-        }).render(`#${paypalContainerRef.current.id}`).catch((err: any) => {
-            console.error("PayPal button rendering failed", err);
-        });
+          });
+          
+          paypalButton.render(`#${containerId}`);
+        } catch (err) {
+          console.error("PayPal Rendering Error:", err);
+        }
       } else {
-        console.error("PayPal SDK or HostedButtons component not found");
+        console.error("PayPal SDK not loaded properly. Ensure client-id and components are correct in index.html");
       }
     }
+
+    return () => {
+      // Cleanup if needed, though HostedButtons cleanup is internal
+    };
   }, [paymentMethod, selectedPack, onPurchase]);
 
   return (
     <div className="max-w-4xl mx-auto h-full flex flex-col gap-6 overflow-y-auto pb-32 hide-scrollbar">
-      {/* Header */}
+      {/* Header Section */}
       <div className="flex items-center justify-between px-4 mt-4">
         <div>
           <h1 className="text-3xl font-black text-white tracking-tighter uppercase italic">Diamond Vault</h1>
@@ -104,7 +109,7 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
         </div>
       </div>
 
-      {/* Featured Banner */}
+      {/* Hero Banner */}
       <div className="px-4">
         <div className="w-full aspect-[21/9] rounded-[2.5rem] overflow-hidden relative border border-white/5 shadow-2xl group">
           <img 
@@ -113,36 +118,36 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
             alt="promo" 
           />
           <div className="absolute inset-0 bg-gradient-to-r from-zinc-950 via-zinc-950/40 to-transparent flex flex-col justify-center px-12">
-             <div className="inline-block w-fit px-3 py-1 bg-pink-600 rounded-lg text-[8px] font-black text-white uppercase tracking-widest mb-4">LIMITED OFFER</div>
-             <h2 className="text-4xl font-black text-white leading-none mb-2">Double Influence Week</h2>
-             <p className="text-zinc-400 text-xs font-medium max-w-sm">Every diamond pack purchased today grants elite-tier profile visibility for 24 hours.</p>
+             <div className="inline-block w-fit px-3 py-1 bg-pink-600 rounded-lg text-[8px] font-black text-white uppercase tracking-widest mb-4">PLATINUM OFFER</div>
+             <h2 className="text-4xl font-black text-white leading-none mb-2">Double Vault Unlock</h2>
+             <p className="text-zinc-400 text-xs font-medium max-w-sm">Support your favorite creators. Every diamond sent through our secure gateway is tracked in real-time.</p>
           </div>
         </div>
       </div>
 
-      {/* Packs Grid */}
+      {/* Diamond Packs Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 lg:gap-6 px-4">
         {DIAMOND_PACKS.map((pack) => (
           <div 
             key={pack.id} 
-            className="glass-panel p-6 rounded-[2rem] border border-white/5 flex flex-col items-center gap-4 group hover:border-pink-500/20 hover:bg-white/[0.02] transition-all cursor-pointer relative overflow-hidden"
+            className={`glass-panel p-6 rounded-[2rem] border transition-all cursor-pointer relative overflow-hidden group ${selectedPack?.id === pack.id ? 'border-pink-500 bg-pink-500/5' : 'border-white/5 hover:border-pink-500/20 hover:bg-white/[0.02]'}`}
             onClick={() => handleBuy(pack)}
           >
             <div className="w-16 h-16 rounded-2xl bg-zinc-950/50 flex items-center justify-center text-3xl group-hover:scale-110 transition-transform">
-              <i className={`fa-solid fa-gem text-cyan-400 drop-shadow-[0_0_15px_rgba(34,211,238,0.4)]`}></i>
+              <i className="fa-solid fa-gem text-cyan-400 drop-shadow-[0_0_15px_rgba(34,211,238,0.4)]"></i>
             </div>
-            <div className="text-center">
+            <div className="text-center mt-2">
                <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">{pack.label}</p>
                <h3 className="text-2xl font-black text-white">{pack.amount.toLocaleString()}</h3>
             </div>
-            <div className="w-full py-3 bg-white/5 rounded-xl border border-white/10 flex items-center justify-center group-hover:bg-pink-600 group-hover:border-pink-500 transition-all">
-               <span className="text-xs font-black text-zinc-300 group-hover:text-white">${pack.price.toFixed(2)}</span>
+            <div className={`w-full py-3 rounded-xl border flex items-center justify-center mt-2 transition-all ${selectedPack?.id === pack.id ? 'bg-pink-600 border-pink-500 text-white' : 'bg-white/5 border-white/10 text-zinc-300 group-hover:bg-pink-600 group-hover:border-pink-500 group-hover:text-white'}`}>
+               <span className="text-xs font-black">${pack.price.toFixed(2)}</span>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Info Section */}
+      {/* Security Info */}
       <div className="px-4">
         <div className="glass-panel p-8 rounded-[2.5rem] border-white/5 flex flex-col md:flex-row items-center justify-between gap-6 bg-gradient-to-br from-indigo-600/10 via-transparent to-transparent">
            <div className="flex items-center gap-6">
@@ -150,9 +155,9 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
                  <i className="fa-solid fa-shield-halved"></i>
               </div>
               <div className="max-w-md">
-                 <h4 className="text-sm font-black text-white uppercase tracking-widest mb-1">Secure Transactions</h4>
+                 <h4 className="text-sm font-black text-white uppercase tracking-widest mb-1">Elite Security Protocols</h4>
                  <p className="text-[10px] text-zinc-500 leading-relaxed font-bold uppercase tracking-tighter">
-                    All diamond purchases are processed through bank-grade encryption. Your influence is our priority.
+                    Transactions are processed directly through the Admin Merchant Wallet. Your profile balance is updated automatically upon confirmation.
                  </p>
               </div>
            </div>
@@ -160,7 +165,7 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
         </div>
       </div>
 
-      {/* Enhanced Checkout Modal */}
+      {/* Checkout Modal */}
       {selectedPack && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-zinc-950/90 backdrop-blur-xl animate-in fade-in duration-300">
           <div className="w-full max-w-md glass-panel p-8 rounded-[3rem] border-white/10 shadow-2xl space-y-6 relative overflow-hidden text-center">
@@ -174,29 +179,28 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
               <div className="w-16 h-16 rounded-3xl bg-cyan-600/20 flex items-center justify-center text-3xl text-cyan-400 mx-auto shadow-2xl mb-2">
                 <i className="fa-solid fa-gem"></i>
               </div>
-              <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Diamond Purchase</h3>
-              <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Adding {selectedPack.amount.toLocaleString()} Diamonds to Vault</p>
+              <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Confirm Selection</h3>
+              <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Adding {selectedPack.amount.toLocaleString()} Diamonds to Profile</p>
             </div>
 
             <div className="p-4 bg-white/5 rounded-2xl border border-white/5 flex justify-between items-center">
-               <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Total to Pay</span>
+               <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Total Transaction</span>
                <span className="text-xl font-black text-white">${selectedPack.price.toFixed(2)}</span>
             </div>
 
-            {/* Payment Method Selection */}
             <div className="space-y-4">
-              <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest text-left ml-2">Select Payment Provider</p>
+              <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest text-left ml-2">Choose Payment Channel</p>
               <div className="grid grid-cols-2 gap-3">
                 <button 
                   onClick={() => setPaymentMethod('visa')}
-                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${paymentMethod === 'visa' ? 'bg-indigo-600/20 border-indigo-500 text-white' : 'bg-white/5 border-white/10 text-zinc-500'}`}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${paymentMethod === 'visa' ? 'bg-indigo-600/20 border-indigo-500 text-white' : 'bg-white/5 border-white/10 text-zinc-500 hover:bg-white/10'}`}
                 >
                   <i className="fa-brands fa-cc-visa text-2xl"></i>
-                  <span className="text-[8px] font-black uppercase tracking-widest">Visa / Card</span>
+                  <span className="text-[8px] font-black uppercase tracking-widest">Debit/Credit</span>
                 </button>
                 <button 
                   onClick={() => setPaymentMethod('paypal')}
-                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${paymentMethod === 'paypal' ? 'bg-blue-600/20 border-blue-500 text-white' : 'bg-white/5 border-white/10 text-zinc-500'}`}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${paymentMethod === 'paypal' ? 'bg-blue-600/20 border-blue-500 text-white' : 'bg-white/5 border-white/10 text-zinc-500 hover:bg-white/10'}`}
                 >
                   <i className="fa-brands fa-paypal text-2xl"></i>
                   <span className="text-[8px] font-black uppercase tracking-widest">PayPal</span>
@@ -204,59 +208,59 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
               </div>
             </div>
 
-            {/* Conditional Payment Forms */}
+            {/* Visa Flow */}
             {paymentMethod === 'visa' && (
               <div className="space-y-3 animate-in slide-in-from-top-2">
-                <input 
-                  type="text" 
-                  placeholder="Card Number" 
-                  className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-xs text-white focus:outline-none focus:border-indigo-500"
-                />
-                <div className="grid grid-cols-2 gap-3">
-                  <input type="text" placeholder="MM/YY" className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-xs text-white focus:outline-none focus:border-indigo-500" />
-                  <input type="text" placeholder="CVC" className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-xs text-white focus:outline-none focus:border-indigo-500" />
+                <div className="space-y-2 text-left">
+                  <input type="text" placeholder="Card Number" className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-xs text-white focus:outline-none focus:border-indigo-500" />
+                  <div className="grid grid-cols-2 gap-3">
+                    <input type="text" placeholder="MM/YY" className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-xs text-white focus:outline-none focus:border-indigo-500" />
+                    <input type="text" placeholder="CVC" className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-xs text-white focus:outline-none focus:border-indigo-500" />
+                  </div>
                 </div>
                 <button 
-                  onClick={confirmPurchase}
+                  onClick={confirmVisaPurchase}
                   disabled={isProcessing}
-                  className={`w-full py-5 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-2xl transition-all active:scale-95 bg-pink-600 shadow-pink-600/40`}
+                  className="w-full py-5 bg-pink-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-2xl transition-all active:scale-95 disabled:opacity-50"
                 >
-                  {isProcessing ? (
-                    <i className="fa-solid fa-circle-notch animate-spin"></i>
-                  ) : (
-                    `PAY $${selectedPack.price.toFixed(2)}`
-                  )}
+                  {isProcessing ? <i className="fa-solid fa-circle-notch animate-spin"></i> : `COMPLETE PAYMENT`}
                 </button>
               </div>
             )}
 
+            {/* PayPal Flow */}
             {paymentMethod === 'paypal' && (
               <div className="space-y-4 animate-in slide-in-from-top-2">
-                <div className="p-6 bg-blue-600/10 border border-blue-500/20 rounded-2xl text-center min-h-[160px] flex flex-col items-center justify-center">
+                <div className="p-6 bg-blue-600/10 border border-blue-500/20 rounded-3xl text-center min-h-[160px] flex flex-col items-center justify-center">
                     <div id="paypal-container-MUH345U2QKVG8" ref={paypalContainerRef} className="w-full flex justify-center py-2">
                         <div className="animate-pulse flex flex-col items-center gap-2">
-                            <i className="fa-brands fa-paypal text-2xl text-blue-400"></i>
-                            <span className="text-[10px] text-blue-300 font-bold uppercase tracking-widest">Loading Secure Button...</span>
+                            <i className="fa-brands fa-paypal text-3xl text-blue-400"></i>
+                            <span className="text-[10px] text-blue-300 font-bold uppercase tracking-[0.2em]">Connecting to PayPal...</span>
                         </div>
                     </div>
-                    <p className="text-[8px] text-zinc-500 uppercase tracking-widest mt-2">Diamonds are credited automatically after payment</p>
+                    <p className="text-[8px] text-zinc-500 uppercase tracking-widest mt-4">
+                      Diamonds are added instantly to your profile upon confirmation.
+                    </p>
                 </div>
               </div>
             )}
 
             {!paymentMethod && (
-               <div className="py-8 text-zinc-600 italic text-xs">
-                 Please select a provider to continue
+               <div className="py-8 text-zinc-600 italic text-[10px] uppercase tracking-widest">
+                 Please select your preferred gateway
                </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Success Toast */}
+      {/* Success Notification */}
       {showSuccess && (
-        <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[110] px-8 py-4 bg-green-600 text-white rounded-full font-black text-[10px] uppercase tracking-widest shadow-2xl animate-in slide-in-from-top-12 duration-500">
-           <i className="fa-solid fa-check mr-2"></i> Diamonds Credited to your Vault!
+        <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[110] px-10 py-5 bg-green-600 text-white rounded-3xl font-black text-[11px] uppercase tracking-widest shadow-[0_20px_60px_rgba(22,163,74,0.4)] animate-in slide-in-from-top-12 duration-500">
+           <div className="flex items-center gap-3">
+              <i className="fa-solid fa-circle-check text-lg"></i>
+              <span>Payment Successful. Diamonds Synchronized.</span>
+           </div>
         </div>
       )}
     </div>
