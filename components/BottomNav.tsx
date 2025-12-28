@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { ViewType } from '../types';
+import { useTranslation } from '../contexts/LanguageContext';
 
 interface BottomNavProps {
   activeView: ViewType;
@@ -8,12 +9,13 @@ interface BottomNavProps {
 }
 
 const BottomNav: React.FC<BottomNavProps> = ({ activeView, onNavigate }) => {
+  const { t } = useTranslation();
   const navItems = [
-    { id: 'feed', label: 'Explore', icon: 'fa-compass' },
-    { id: 'discovery', label: 'Like Me', icon: 'fa-fire' },
-    { id: 'live', label: 'Live', icon: 'fa-video', primary: true },
-    { id: 'store', label: 'Shop', icon: 'fa-gem' },
-    { id: 'profile', label: 'Account', icon: 'fa-user' },
+    { id: 'feed', label: t('explore_feed'), icon: 'fa-compass' },
+    { id: 'discovery', label: t('discovery'), icon: 'fa-fire' },
+    { id: 'live', label: t('live'), icon: 'fa-video', primary: true },
+    { id: 'store', label: t('shop'), icon: 'fa-gem' },
+    { id: 'profile', label: t('account'), icon: 'fa-user' },
   ] as const;
 
   return (

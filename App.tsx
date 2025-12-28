@@ -13,8 +13,9 @@ import StoreView from './components/StoreView';
 import BottomNav from './components/BottomNav';
 import { ViewType } from './types';
 import { db, UserDB } from './services/databaseService';
+import { LanguageProvider } from './contexts/LanguageContext';
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
@@ -23,17 +24,14 @@ const App: React.FC = () => {
   const [platformRevenue, setPlatformRevenue] = useState<number>(0);
   const [pendingReferrer, setPendingReferrer] = useState<string | null>(null);
 
-  // Load from Database on mount and check for referrals
   useEffect(() => {
     const init = async () => {
-      // Detect Referral Code
       const hash = window.location.hash;
       if (hash.includes('ref=')) {
         try {
           const encodedEmail = hash.split('ref=')[1];
           const decodedEmail = atob(encodedEmail);
           setPendingReferrer(decodedEmail);
-          console.log("Detected referrer:", decodedEmail);
         } catch (e) {
           console.error("Invalid referral link");
         }
@@ -63,7 +61,6 @@ const App: React.FC = () => {
     
     let u = await db.getUser(email);
     if (!u) {
-      // Brand new user sign up
       u = await db.upsertUser({ 
         name, 
         email, 
@@ -75,7 +72,7 @@ const App: React.FC = () => {
         referredBy: pendingReferrer || undefined,
         referralCount: 0
       });
-      setPendingReferrer(null); // Clear once processed
+      setPendingReferrer(null);
     }
 
     if (isAdminUser || window.location.hash === '#/admin-portal') {
@@ -86,7 +83,6 @@ const App: React.FC = () => {
     setUser(u);
     setIsAuthenticated(true);
     localStorage.setItem('mydoll_active_user', email);
-    // Clean URL
     window.location.hash = '';
   };
 
@@ -173,5 +169,11 @@ const App: React.FC = () => {
     </div>
   );
 };
+
+const App: React.FC = () => (
+  <LanguageProvider>
+    <AppContent />
+  </LanguageProvider>
+);
 
 export default App;

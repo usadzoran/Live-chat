@@ -1,5 +1,5 @@
 
-import { WithdrawalRecord, Publication } from '../types';
+import { WithdrawalRecord, Publication, AdConfig } from '../types';
 
 const DB_NAME = 'mydoll_cloud_db_v3';
 
@@ -25,6 +25,9 @@ export interface UserDB {
   country?: string;
   referredBy?: string;
   referralCount?: number;
+  status?: 'active' | 'banned';
+  role?: 'doll' | 'mentor' | 'admin';
+  joinedAt?: string;
 }
 
 export interface PlatformDB {
@@ -37,6 +40,7 @@ export interface PlatformDB {
     isLive: boolean;
   };
   globalPublications: Publication[];
+  ads: AdConfig[];
 }
 
 class DatabaseService {
@@ -46,8 +50,13 @@ class DatabaseService {
     const saved = localStorage.getItem(DB_NAME);
     if (saved) {
       this.data = JSON.parse(saved);
-      if (!this.data.platform.globalPublications) {
-        this.data.platform.globalPublications = [];
+      // Ensure migrations for new fields
+      if (!this.data.platform.globalPublications) this.data.platform.globalPublications = [];
+      if (!this.data.platform.ads) {
+        this.data.platform.ads = [
+          { id: '1', placement: 'under_header', enabled: true, title: 'Luxury Watches', imageUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=400&q=80', link: '#' },
+          { id: '3', placement: 'under_publication', enabled: true, title: 'Diamond Gifting', imageUrl: 'https://images.unsplash.com/photo-1588444833098-4205565e2482?auto=format&fit=crop&w=400&q=80', link: '#' },
+        ];
       }
     } else {
       this.data = {
@@ -64,7 +73,10 @@ class DatabaseService {
             cover: 'https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=1200&q=80',
             gender: 'men',
             country: 'Global',
-            referralCount: 0
+            referralCount: 0,
+            status: 'active',
+            role: 'admin',
+            joinedAt: new Date().toISOString()
           }
         },
         platform: { 
@@ -89,6 +101,10 @@ class DatabaseService {
               comments: [{ id: 'c1', user: 'TechGuru', text: 'Clean setup, man!', timestamp: new Date() }],
               timestamp: new Date(Date.now() - 3600000)
             }
+          ],
+          ads: [
+            { id: '1', placement: 'under_header', enabled: true, title: 'Luxury Watches', imageUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=400&q=80', link: '#' },
+            { id: '3', placement: 'under_publication', enabled: true, title: 'Diamond Gifting', imageUrl: 'https://images.unsplash.com/photo-1588444833098-4205565e2482?auto=format&fit=crop&w=400&q=80', link: '#' },
           ]
         }
       };
@@ -105,30 +121,57 @@ class DatabaseService {
   }
 
   async getAllUsers(): Promise<UserDB[]> {
-    return Object.values(this.data.users);
+    return Object.values(this.data.users).sort((a, b) => 
+      new Date(b.joinedAt || 0).getTime() - new Date(a.joinedAt || 0).getTime()
+    );
   }
 
   async upsertUser(user: UserDB): Promise<UserDB> {
-    // If user is brand new and has a referrer, reward them
     const isNew = !this.data.users[user.email];
-    if (isNew && user.referredBy) {
-      const referrer = this.data.users[user.referredBy];
-      if (referrer) {
-        referrer.diamonds += 500; // Reward for inviting a friend
-        referrer.referralCount = (referrer.referralCount || 0) + 1;
+    if (isNew) {
+      user.joinedAt = user.joinedAt || new Date().toISOString();
+      user.status = user.status || 'active';
+      user.role = user.role || (user.gender === 'women' ? 'doll' : 'mentor');
+      
+      if (user.referredBy) {
+        const referrer = this.data.users[user.referredBy];
+        if (referrer) {
+          referrer.diamonds += 500;
+          referrer.referralCount = (referrer.referralCount || 0) + 1;
+        }
       }
     }
     
     this.data.users[user.email] = {
+      ...this.data.users[user.email],
       ...user,
-      referralCount: user.referralCount || 0
+      referralCount: user.referralCount || (this.data.users[user.email]?.referralCount || 0)
     };
     this.save();
     return this.data.users[user.email];
   }
 
+  async toggleUserStatus(email: string): Promise<void> {
+    const user = this.data.users[email];
+    if (user) {
+      user.status = user.status === 'banned' ? 'active' : 'banned';
+      this.save();
+    }
+  }
+
   async getPlatformRevenue(): Promise<number> {
     return this.data.platform.revenue;
+  }
+
+  async getAds(): Promise<AdConfig[]> {
+    return this.data.platform.ads;
+  }
+
+  async updateAdConfig(updatedAd: AdConfig): Promise<void> {
+    this.data.platform.ads = this.data.platform.ads.map(a => 
+      a.id === updatedAd.id ? updatedAd : a
+    );
+    this.save();
   }
 
   async getGlobalPublications(): Promise<Publication[]> {
@@ -150,11 +193,18 @@ class DatabaseService {
   }
 
   async getPlatformStats() {
+    const users = Object.values(this.data.users);
+    const totalDiamondsInSystem = users.reduce((sum, u) => sum + u.diamonds, 0);
+    
     return {
       revenue: this.data.platform.revenue,
       totalPayouts: this.data.platform.totalPayouts,
       merchantId: this.data.platform.merchantConfig.clientId,
-      isLive: this.data.platform.merchantConfig.isLive
+      isLive: this.data.platform.merchantConfig.isLive,
+      userCount: users.length,
+      liabilityUsd: totalDiamondsInSystem / 100,
+      dollCount: users.filter(u => u.role === 'doll').length,
+      mentorCount: users.filter(u => u.role === 'mentor').length,
     };
   }
 
