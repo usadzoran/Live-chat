@@ -18,15 +18,17 @@ const DIAMOND_PACKS = [
 
 const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) => {
   const [selectedPack, setSelectedPack] = useState<typeof DIAMOND_PACKS[0] | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'visa' | 'paypal' | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
   const handleBuy = (pack: typeof DIAMOND_PACKS[0]) => {
     setSelectedPack(pack);
+    setPaymentMethod(null); // Reset payment method on new selection
   };
 
   const confirmPurchase = () => {
-    if (!selectedPack) return;
+    if (!selectedPack || !paymentMethod) return;
     setIsProcessing(true);
     // Simulate payment processing
     setTimeout(() => {
@@ -35,7 +37,8 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
       setSelectedPack(null);
-    }, 1500);
+      setPaymentMethod(null);
+    }, 2000);
   };
 
   return (
@@ -108,10 +111,10 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
         </div>
       </div>
 
-      {/* Checkout Modal */}
+      {/* Enhanced Checkout Modal */}
       {selectedPack && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-zinc-950/90 backdrop-blur-xl animate-in fade-in duration-300">
-          <div className="w-full max-w-sm glass-panel p-8 rounded-[3rem] border-white/10 shadow-2xl space-y-8 relative overflow-hidden text-center">
+          <div className="w-full max-w-md glass-panel p-8 rounded-[3rem] border-white/10 shadow-2xl space-y-6 relative overflow-hidden text-center">
             <div className="absolute top-6 right-6">
               <button onClick={() => setSelectedPack(null)} className="text-zinc-600 hover:text-white">
                  <i className="fa-solid fa-xmark"></i>
@@ -119,27 +122,69 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
             </div>
             
             <div className="space-y-2">
-              <div className="w-20 h-20 rounded-3xl bg-cyan-600/20 flex items-center justify-center text-4xl text-cyan-400 mx-auto shadow-2xl mb-4">
-                <i className="fa-solid fa-gem animate-bounce"></i>
+              <div className="w-16 h-16 rounded-3xl bg-cyan-600/20 flex items-center justify-center text-3xl text-cyan-400 mx-auto shadow-2xl mb-2">
+                <i className="fa-solid fa-gem"></i>
               </div>
-              <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Confirm Purchase</h3>
-              <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">You are adding {selectedPack.amount.toLocaleString()} Diamonds</p>
+              <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Diamond Purchase</h3>
+              <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Adding {selectedPack.amount.toLocaleString()} Diamonds to Vault</p>
             </div>
 
-            <div className="p-6 bg-white/5 rounded-2xl border border-white/5 flex justify-between items-center">
-               <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Total Cost</span>
+            <div className="p-4 bg-white/5 rounded-2xl border border-white/5 flex justify-between items-center">
+               <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Total to Pay</span>
                <span className="text-xl font-black text-white">${selectedPack.price.toFixed(2)}</span>
             </div>
 
+            {/* Payment Method Selection */}
+            <div className="space-y-4">
+              <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest text-left ml-2">Select Payment Provider</p>
+              <div className="grid grid-cols-2 gap-3">
+                <button 
+                  onClick={() => setPaymentMethod('visa')}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${paymentMethod === 'visa' ? 'bg-indigo-600/20 border-indigo-500 text-white' : 'bg-white/5 border-white/10 text-zinc-500'}`}
+                >
+                  <i className="fa-brands fa-cc-visa text-2xl"></i>
+                  <span className="text-[8px] font-black uppercase tracking-widest">Visa / Card</span>
+                </button>
+                <button 
+                  onClick={() => setPaymentMethod('paypal')}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${paymentMethod === 'paypal' ? 'bg-blue-600/20 border-blue-500 text-white' : 'bg-white/5 border-white/10 text-zinc-500'}`}
+                >
+                  <i className="fa-brands fa-paypal text-2xl"></i>
+                  <span className="text-[8px] font-black uppercase tracking-widest">PayPal</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Conditional Payment Forms */}
+            {paymentMethod === 'visa' && (
+              <div className="space-y-3 animate-in slide-in-from-top-2">
+                <input 
+                  type="text" 
+                  placeholder="Card Number" 
+                  className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-xs text-white focus:outline-none focus:border-indigo-500"
+                />
+                <div className="grid grid-cols-2 gap-3">
+                  <input type="text" placeholder="MM/YY" className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-xs text-white focus:outline-none focus:border-indigo-500" />
+                  <input type="text" placeholder="CVC" className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-xs text-white focus:outline-none focus:border-indigo-500" />
+                </div>
+              </div>
+            )}
+
+            {paymentMethod === 'paypal' && (
+              <div className="p-4 bg-blue-600/10 border border-blue-500/20 rounded-2xl text-center animate-in slide-in-from-top-2">
+                <p className="text-[10px] text-blue-300 font-bold">Secure redirection to PayPal authorized portal...</p>
+              </div>
+            )}
+
             <button 
               onClick={confirmPurchase}
-              disabled={isProcessing}
-              className="w-full py-5 bg-pink-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-2xl shadow-pink-600/40 active:scale-95 transition-all"
+              disabled={isProcessing || !paymentMethod}
+              className={`w-full py-5 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-2xl transition-all active:scale-95 ${!paymentMethod ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed' : 'bg-pink-600 shadow-pink-600/40'}`}
             >
               {isProcessing ? (
                 <i className="fa-solid fa-circle-notch animate-spin"></i>
               ) : (
-                'PURCHASE NOW'
+                `CONFIRM & PAY $${selectedPack.price.toFixed(2)}`
               )}
             </button>
           </div>
