@@ -12,96 +12,66 @@ import AdminDashboard from './components/AdminDashboard';
 import StoreView from './components/StoreView';
 import BottomNav from './components/BottomNav';
 import { ViewType } from './types';
-
-const SESSION_KEY = 'mydoll_session_v1';
-const REVENUE_KEY = 'mydoll_platform_revenue';
+import { db, UserDB } from './services/databaseService';
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
-  const [user, setUser] = useState<{ name: string; email: string; bio?: string; avatar?: string; cover?: string; diamonds: number } | null>(null);
+  const [user, setUser] = useState<UserDB | null>(null);
   const [currentView, setCurrentView] = useState<ViewType>('feed');
   const [platformRevenue, setPlatformRevenue] = useState<number>(0);
 
-  // Load session and revenue from localStorage on mount
+  // Load from Database on mount
   useEffect(() => {
-    const savedSession = localStorage.getItem(SESSION_KEY);
-    if (savedSession) {
-      try {
-        const { user: savedUser, isAdmin: savedIsAdmin } = JSON.parse(savedSession);
-        setUser(savedUser);
-        setIsAdmin(savedIsAdmin);
-        setIsAuthenticated(true);
-        if (savedIsAdmin && window.location.hash === '#/admin-portal') {
-          setCurrentView('admin');
+    const init = async () => {
+      const savedSession = localStorage.getItem('mydoll_active_user');
+      if (savedSession) {
+        const u = await db.getUser(savedSession);
+        if (u) {
+          setUser(u);
+          setIsAuthenticated(true);
+          // Check if it's admin
+          if (u.email === 'admin@mydoll.club' || u.name === 'wahabfresh') {
+            setIsAdmin(true);
+          }
         }
-      } catch (e) {
-        localStorage.removeItem(SESSION_KEY);
       }
-    }
-
-    const savedRevenue = localStorage.getItem(REVENUE_KEY);
-    if (savedRevenue) {
-      setPlatformRevenue(parseFloat(savedRevenue));
-    } else {
-      setPlatformRevenue(842500); // Initial mock revenue
-    }
-  }, []);
-
-  // Sync session to localStorage
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      localStorage.setItem(SESSION_KEY, JSON.stringify({ user, isAdmin }));
-    } else {
-      localStorage.removeItem(SESSION_KEY);
-    }
-  }, [isAuthenticated, user, isAdmin]);
-
-  // Sync revenue to localStorage
-  useEffect(() => {
-    localStorage.setItem(REVENUE_KEY, platformRevenue.toString());
-  }, [platformRevenue]);
-
-  // Secret Link Detection
-  useEffect(() => {
-    const handleHashChange = () => {
-      if (window.location.hash === '#/admin-portal') {
-        setShowAuth(true);
-      }
+      const rev = await db.getPlatformRevenue();
+      setPlatformRevenue(rev);
     };
-    window.addEventListener('hashchange', handleHashChange);
-    handleHashChange();
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    init();
   }, []);
 
-  const handleLogin = (name: string, email: string, password?: string) => {
+  const handleLogin = async (name: string, email: string, password?: string) => {
     const isAdminUser = 
       (email === 'wahabfresh' || name === 'wahabfresh' || email === 'admin@mydoll.club') && 
       password === 'vampirewahab31';
     
-    const isPortalAccess = window.location.hash === '#/admin-portal';
+    let u = await db.getUser(email);
+    if (!u) {
+      u = await db.upsertUser({ 
+        name, 
+        email, 
+        diamonds: isAdminUser ? 99999 : 50,
+        bio: isAdminUser ? "Master Node Administrator" : "Elite member"
+      });
+    }
 
-    let loggedInUser;
-    if (isAdminUser || isPortalAccess) {
+    if (isAdminUser || window.location.hash === '#/admin-portal') {
       setIsAdmin(true);
       setCurrentView('admin');
-      loggedInUser = { 
-        name: isAdminUser ? 'Wahab Fresh' : name, 
-        email: isAdminUser ? 'admin@mydoll.club' : email, 
-        bio: "Master Node Administrator. System access granted.",
-        diamonds: 99999
-      };
-    } else {
-      loggedInUser = { name, email, bio: "Elite member and digital connoisseur.", diamonds: 50 };
     }
     
-    setUser(loggedInUser);
+    setUser(u);
     setIsAuthenticated(true);
+    localStorage.setItem('mydoll_active_user', email);
   };
 
-  const handleUpdateUser = (updatedData: Partial<{ name: string; email: string; bio?: string; avatar?: string; cover?: string; diamonds: number }>) => {
-    setUser(prev => prev ? { ...prev, ...updatedData } : null);
+  const handleUpdateUser = async (updatedData: Partial<UserDB>) => {
+    if (!user) return;
+    const updated = await db.upsertUser({ ...user, ...updatedData });
+    setUser(updated);
   };
 
   const handleLogout = () => {
@@ -111,14 +81,16 @@ const App: React.FC = () => {
     setUser(null);
     setCurrentView('feed');
     window.location.hash = '';
-    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem('mydoll_active_user');
   };
 
-  const handlePurchase = (diamondAmount: number, priceAmount: number) => {
-    // 1. Update user profile diamonds
-    handleUpdateUser({ diamonds: (user?.diamonds || 0) + diamondAmount });
-    // 2. Update Admin Wallet (Platform Revenue)
-    setPlatformRevenue(prev => prev + priceAmount);
+  // This is called after a successful "capture" from the store
+  const handlePurchaseSuccess = async () => {
+    if (!user) return;
+    const freshUser = await db.getUser(user.email);
+    const freshRev = await db.getPlatformRevenue();
+    setUser(freshUser);
+    setPlatformRevenue(freshRev);
   };
 
   if (!isAuthenticated) {
@@ -147,8 +119,8 @@ const App: React.FC = () => {
         return <AdminDashboard totalRevenue={platformRevenue} />;
       case 'store':
         return <StoreView 
-          diamonds={user?.diamonds || 0} 
-          onPurchase={handlePurchase} 
+          user={user!}
+          onPurchaseSuccess={handlePurchaseSuccess}
           onBack={() => setCurrentView('feed')} 
         />;
       default:
