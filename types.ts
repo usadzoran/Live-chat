@@ -45,7 +45,7 @@ export interface Gift {
   color: string;
 }
 
-export type ViewType = 'profile' | 'feed' | 'messages' | 'discovery' | 'live';
+export type ViewType = 'profile' | 'feed' | 'messages' | 'discovery' | 'live' | 'admin';
 
 export interface PayoutSettings {
   method: 'paypal' | 'card' | null;
@@ -73,4 +73,12 @@ export interface Publication {
   dislikes: number;
   comments: Comment[];
   timestamp: Date;
+}
+
+export interface AdminStats {
+  totalRevenue: number;
+  activeDolls: number;
+  activeMentors: number;
+  serverStatus: 'optimal' | 'degraded' | 'critical';
+  aiLatency: number;
 }

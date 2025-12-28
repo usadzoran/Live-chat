@@ -84,9 +84,18 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
 
       <footer className="relative z-10 px-6 py-6 flex justify-between items-center border-t border-white/5 bg-zinc-950">
         <p className="text-[8px] text-zinc-700 font-black uppercase tracking-widest">© 2025 My Doll Elite</p>
-        <div className="flex gap-4 text-zinc-700">
-          <i className="fa-brands fa-instagram text-xs"></i>
-          <i className="fa-brands fa-tiktok text-xs"></i>
+        <div className="flex items-center gap-6">
+          <div className="flex gap-4 text-zinc-700">
+            <i className="fa-brands fa-instagram text-xs"></i>
+            <i className="fa-brands fa-tiktok text-xs"></i>
+          </div>
+          <div className="h-4 w-[1px] bg-zinc-800"></div>
+          <button 
+            onClick={() => window.location.hash = '/admin-portal'}
+            className="text-[8px] text-zinc-800 font-black uppercase tracking-widest hover:text-zinc-600 transition-colors"
+          >
+            System Login
+          </button>
         </div>
       </footer>
     </div>
