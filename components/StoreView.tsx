@@ -22,8 +22,10 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [paypalError, setPaypalError] = useState<string | null>(null);
+  
   const paypalContainerRef = useRef<HTMLDivElement>(null);
   const activePackRef = useRef<typeof DIAMOND_PACKS[0] | null>(null);
+  const isRenderingRef = useRef<boolean>(false);
 
   // Sync ref with state for the PayPal callback
   useEffect(() => {
@@ -52,44 +54,53 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
 
   useEffect(() => {
     let isMounted = true;
-    let renderTimer: number;
+    let renderTimeout: number;
 
-    const renderPaypalButton = async () => {
+    const initPaypal = async () => {
       if (!isMounted || paymentMethod !== 'paypal' || !selectedPack || !paypalContainerRef.current) return;
+      
+      // Prevent double rendering which causes "unhandled exception"
+      if (isRenderingRef.current) return;
+      isRenderingRef.current = true;
 
       const sdk = (window as any).paypal;
       
       if (!sdk || !sdk.HostedButtons) {
-        console.warn("PayPal SDK or HostedButtons not available yet, retrying...");
-        renderTimer = window.setTimeout(renderPaypalButton, 500);
+        console.warn("PayPal SDK not ready, retrying...");
+        isRenderingRef.current = false;
+        renderTimeout = window.setTimeout(initPaypal, 1000);
         return;
       }
 
       try {
-        // Clear previous content
+        // Ensure container is empty and ready
         if (paypalContainerRef.current) {
           paypalContainerRef.current.innerHTML = '';
         }
 
         const ppInstance = sdk.HostedButtons({
-          hostedButtonId: "MUH345U2QKVG8",
+          hostedButtonId: "MUH345U2QKVG8", // Replace with your Sandbox/Live button ID
           onApprove: (data: any, actions: any) => {
             console.log("PayPal Transaction Confirmed", data);
             const pack = activePackRef.current;
             if (pack && isMounted) {
               onPurchase(pack.amount);
               setShowSuccess(true);
-              setTimeout(() => setShowSuccess(false), 5000);
+              setTimeout(() => { if (isMounted) setShowSuccess(false); }, 5000);
               setSelectedPack(null);
               setPaymentMethod(null);
             }
           },
           onCancel: () => {
             console.log("PayPal Transaction Cancelled");
+            if (isMounted) isRenderingRef.current = false;
           },
           onError: (err: any) => {
             console.error("PayPal Error Callback:", err);
-            if (isMounted) setPaypalError("Failed to initialize PayPal. Please try again.");
+            if (isMounted) {
+              setPaypalError("PayPal gateway error. Ensure your account matches the environment.");
+              isRenderingRef.current = false;
+            }
           }
         });
         
@@ -98,18 +109,21 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
         }
       } catch (err) {
         console.error("PayPal Rendering Exception:", err);
-        if (isMounted) setPaypalError("Unable to load PayPal button. Check your connection.");
+        if (isMounted) {
+          setPaypalError("Initialization failed. Please refresh or try another method.");
+          isRenderingRef.current = false;
+        }
       }
     };
 
     if (paymentMethod === 'paypal') {
-      // Small delay to ensure the DOM element is actually painted and available for PayPal's shadow DOM
-      renderTimer = window.setTimeout(renderPaypalButton, 100);
+      renderTimeout = window.setTimeout(initPaypal, 200);
     }
 
     return () => {
       isMounted = false;
-      clearTimeout(renderTimer);
+      clearTimeout(renderTimeout);
+      isRenderingRef.current = false;
     };
   }, [paymentMethod, selectedPack, onPurchase]);
 
@@ -118,7 +132,7 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
       {/* Vault Balance Display */}
       <div className="flex items-center justify-between px-4 mt-4">
         <div>
-          <h1 className="text-3xl font-black text-white tracking-tighter uppercase italic text-shadow-glow">Diamond Vault</h1>
+          <h1 className="text-3xl font-black text-white tracking-tighter uppercase italic">Diamond Vault</h1>
           <p className="text-[10px] text-pink-500 font-black uppercase tracking-[0.3em] mt-1">Enhance your digital presence</p>
         </div>
         <div className="flex items-center gap-3 px-6 py-3 bg-zinc-900 rounded-2xl border border-white/5 shadow-2xl">
@@ -229,8 +243,9 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
 
             {/* Error Message */}
             {paypalError && (
-              <div className="p-3 bg-red-600/10 border border-red-500/20 rounded-xl text-red-500 text-[10px] font-bold uppercase animate-in slide-in-from-top-2">
+              <div className="p-4 bg-red-600/10 border border-red-500/20 rounded-2xl text-red-500 text-[10px] font-bold uppercase animate-in slide-in-from-top-2">
                 <i className="fa-solid fa-circle-exclamation mr-2"></i> {paypalError}
+                <p className="mt-1 text-[8px] opacity-70">If using sandbox, ensure you are logged into a test account.</p>
               </div>
             )}
 

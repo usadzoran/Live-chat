@@ -7,8 +7,11 @@
     <title>My Doll | Next-Gen Social Club</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- PayPal SDK for Hosted Buttons. Note: client-id=sb is for testing. For production, the real Client ID from the dashboard must be used. -->
-    <script src="https://www.paypal.com/sdk/js?client-id=sb&components=hosted-buttons"></script>
+    <!-- PayPal SDK for Hosted Buttons. For production, replace client-id=sb with your real Client ID. -->
+    <script 
+        src="https://www.paypal.com/sdk/js?client-id=sb&components=hosted-buttons"
+        crossorigin="anonymous"
+    ></script>
     <style>
         :root {
           --sat: env(safe-area-inset-top);
