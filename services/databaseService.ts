@@ -3,12 +3,20 @@ import { WithdrawalRecord } from '../types';
 
 const DB_NAME = 'mydoll_cloud_db_v3';
 
+export interface AlbumPhoto {
+  id: string;
+  url: string;
+  price: number;
+  caption?: string;
+}
+
 export interface UserDB {
   name: string;
   email: string;
   diamonds: number;
   usd_balance: number; // Earnings from being a Doll/Streamer
   withdrawals: WithdrawalRecord[];
+  album: AlbumPhoto[];
   bio?: string;
   avatar?: string;
   cover?: string;
@@ -41,6 +49,7 @@ class DatabaseService {
             diamonds: 99999,
             usd_balance: 5420.50,
             withdrawals: [],
+            album: [],
             bio: 'Master Node Administrator'
           }
         },
