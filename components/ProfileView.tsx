@@ -1,6 +1,6 @@
 
 import React, { useState, useRef } from 'react';
-import { PayoutSettings } from '../types';
+import { PayoutSettings, ViewType } from '../types';
 
 interface UserProfile {
   name: string;
@@ -8,6 +8,7 @@ interface UserProfile {
   bio?: string;
   avatar?: string;
   cover?: string;
+  diamonds: number;
 }
 
 interface GalleryItem {
@@ -17,15 +18,17 @@ interface GalleryItem {
   comments: string;
   type: 'free' | 'paid';
   price?: number;
+  isUnlocked?: boolean;
 }
 
 interface ProfileViewProps {
   user: UserProfile;
   onUpdate: (updated: UserProfile) => void;
   onBack: () => void;
+  onNavigate: (view: ViewType) => void;
 }
 
-const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack }) => {
+const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNavigate }) => {
   const [formData, setFormData] = useState<UserProfile>({ 
     ...user,
     avatar: user.avatar || `https://ui-avatars.com/api/?name=${user.name}&size=256&background=f472b6&color=fff`,
@@ -41,9 +44,13 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack }) => 
   const [galleryPhotos, setGalleryPhotos] = useState<GalleryItem[]>([
     { id: '1', url: 'https://images.unsplash.com/photo-1511367461989-f85a21fda167?auto=format&fit=crop&w=600&q=80', likes: '1.2k', comments: '45', type: 'free' },
     { id: '2', url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=600&q=80', likes: '890', comments: '22', type: 'free' },
-    { id: '3', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80', likes: '2.4k', comments: '112', type: 'paid', price: 99.00 },
-    { id: '6', url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80', likes: '920', comments: '28', type: 'paid', price: 150.00 },
+    { id: '3', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80', likes: '2.4k', comments: '112', type: 'paid', price: 99 },
+    { id: '6', url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80', likes: '920', comments: '28', type: 'paid', price: 150 },
   ]);
+
+  // Unlock simulation state
+  const [unlockedIds, setUnlockedIds] = useState<Set<string>>(new Set());
+  const [errorToast, setErrorToast] = useState<string | null>(null);
 
   // Upload Modal State
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -87,6 +94,19 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack }) => 
     setActiveGalleryType(item.type);
   };
 
+  const handleUnlock = (item: GalleryItem) => {
+    if (unlockedIds.has(item.id)) return;
+    const price = item.price || 0;
+    if (user.diamonds < price) {
+      setErrorToast(`Insufficient Diamonds. You need ${price - user.diamonds} more.`);
+      setTimeout(() => setErrorToast(null), 3000);
+      return;
+    }
+
+    onUpdate({ ...user, diamonds: user.diamonds - price });
+    setUnlockedIds(new Set([...Array.from(unlockedIds), item.id]));
+  };
+
   const deleteItem = (id: string) => {
     setGalleryPhotos(prev => prev.filter(p => p.id !== id));
   };
@@ -124,6 +144,10 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack }) => 
         >
           <i className="fa-solid fa-arrow-left text-xs"></i>
         </button>
+        <div className="absolute top-6 right-6 px-4 py-2 bg-zinc-950/40 backdrop-blur-xl border border-white/10 rounded-2xl flex items-center gap-2">
+           <i className="fa-solid fa-gem text-cyan-400 text-[10px]"></i>
+           <span className="text-xs font-black text-white">{user.diamonds.toLocaleString()}</span>
+        </div>
         <input type="file" ref={coverInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileChange(e, 'cover')} />
       </div>
 
@@ -213,7 +237,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack }) => 
                   {/* Mystery Blur for fans, or creator viewing paid content */}
                   <img 
                     src={item.url} 
-                    className={`w-full h-full object-cover transition-all duration-700 ${item.type === 'paid' && !isEditing ? 'blur-2xl scale-110 brightness-50' : 'group-hover:scale-110'}`} 
+                    className={`w-full h-full object-cover transition-all duration-700 ${item.type === 'paid' && !isEditing && !unlockedIds.has(item.id) ? 'blur-2xl scale-110 brightness-50' : 'group-hover:scale-110'}`} 
                     alt="gallery" 
                   />
                   
@@ -224,12 +248,18 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack }) => 
                     </div>
                   )}
 
-                  {item.type === 'paid' && !isEditing && (
+                  {item.type === 'paid' && !isEditing && !unlockedIds.has(item.id) && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-[5]">
-                       <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20">
-                          <i className="fa-solid fa-lock text-white text-xl"></i>
+                       <button 
+                        onClick={(e) => { e.stopPropagation(); handleUnlock(item); }}
+                        className="w-16 h-16 rounded-[1.5rem] bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center hover:bg-indigo-600 hover:scale-110 transition-all group/lock"
+                       >
+                          <i className="fa-solid fa-lock text-white text-xl group-hover/lock:hidden"></i>
+                          <i className="fa-solid fa-key text-white text-xl hidden group-hover/lock:block"></i>
+                       </button>
+                       <div className="bg-black/40 backdrop-blur-md px-3 py-1 rounded-full border border-white/10">
+                          <p className="text-[8px] font-black text-white/80 uppercase tracking-[0.3em]">Unlock for {item.price} Diamonds</p>
                        </div>
-                       <p className="text-[8px] font-black text-white/60 uppercase tracking-[0.3em]">Premium Content</p>
                     </div>
                   )}
 
@@ -254,15 +284,36 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack }) => 
 
         {activeTab === 'wallet' && (
           <div className="max-w-2xl mx-auto flex flex-col gap-6 lg:gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="glass-panel p-8 lg:p-12 rounded-[2.5rem] lg:rounded-[3rem] border-white/5 bg-gradient-to-br from-pink-600/10 via-transparent to-indigo-600/5 relative overflow-hidden shadow-2xl">
+            <div className="glass-panel p-8 lg:p-12 rounded-[2.5rem] lg:rounded-[3rem] border-white/5 bg-gradient-to-br from-indigo-600/10 via-transparent to-pink-600/5 relative overflow-hidden shadow-2xl">
               <div className="relative z-10">
-                <p className="text-[10px] lg:text-[12px] font-black text-pink-500 uppercase tracking-widest mb-3">Available for Payout</p>
-                <h2 className="text-5xl lg:text-7xl font-black text-white tracking-tighter mb-8">$1,284<span className="text-zinc-500 text-3xl">.50</span></h2>
-                <button className="px-8 py-4 bg-white text-black font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-xl hover:bg-zinc-200 active:scale-95 transition-all">
-                  WITHDRAW FUNDS
+                <p className="text-[10px] lg:text-[12px] font-black text-pink-500 uppercase tracking-widest mb-3">Your Influence Balance</p>
+                <div className="flex items-center gap-4 mb-8">
+                   <div className="w-16 h-16 rounded-3xl bg-cyan-600/20 border border-cyan-500/30 flex items-center justify-center text-3xl text-cyan-400">
+                      <i className="fa-solid fa-gem"></i>
+                   </div>
+                   <h2 className="text-5xl lg:text-7xl font-black text-white tracking-tighter">
+                    {user.diamonds.toLocaleString()}
+                   </h2>
+                </div>
+                <button 
+                  onClick={() => onNavigate('store')}
+                  className="px-8 py-4 bg-white text-black font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-xl hover:bg-zinc-200 active:scale-95 transition-all"
+                >
+                  GET MORE DIAMONDS
                 </button>
               </div>
-              <i className="fa-solid fa-vault absolute -bottom-10 -right-10 text-[12rem] text-white/[0.02]"></i>
+              <i className="fa-solid fa-gem absolute -bottom-10 -right-10 text-[12rem] text-white/[0.02]"></i>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+               <div className="glass-panel p-6 rounded-[2rem] border-white/5 flex flex-col gap-2">
+                  <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Lifetime Unlocked</p>
+                  <p className="text-2xl font-black text-white">42</p>
+               </div>
+               <div className="glass-panel p-6 rounded-[2rem] border-white/5 flex flex-col gap-2">
+                  <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Top Creator Rank</p>
+                  <p className="text-2xl font-black text-pink-500">#124</p>
+               </div>
             </div>
           </div>
         )}
@@ -383,6 +434,12 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack }) => 
       {isSaved && (
         <div className="fixed bottom-24 lg:bottom-12 left-1/2 -translate-x-1/2 px-8 py-3 bg-green-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-2xl animate-in slide-in-from-bottom-8 duration-500 z-[100]">
            <i className="fa-solid fa-check mr-2"></i> Vault Updated Successfully
+        </div>
+      )}
+
+      {errorToast && (
+        <div className="fixed bottom-24 lg:bottom-12 left-1/2 -translate-x-1/2 px-8 py-3 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-2xl animate-in slide-in-from-bottom-8 duration-500 z-[100]">
+           <i className="fa-solid fa-triangle-exclamation mr-2"></i> {errorToast}
         </div>
       )}
     </div>

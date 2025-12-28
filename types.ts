@@ -54,7 +54,7 @@ export interface Gift {
   color: string;
 }
 
-export type ViewType = 'profile' | 'feed' | 'messages' | 'discovery' | 'live' | 'admin';
+export type ViewType = 'profile' | 'feed' | 'messages' | 'discovery' | 'live' | 'admin' | 'store';
 
 export interface PayoutSettings {
   method: 'paypal' | 'card' | null;

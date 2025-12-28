@@ -12,7 +12,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeView, onNavigate }) => {
     { id: 'feed', label: 'Explore', icon: 'fa-compass' },
     { id: 'discovery', label: 'Like Me', icon: 'fa-fire' },
     { id: 'live', label: 'Live', icon: 'fa-video', primary: true },
-    { id: 'messages', label: 'DM', icon: 'fa-paper-plane' },
+    { id: 'store', label: 'Shop', icon: 'fa-gem' },
     { id: 'profile', label: 'Account', icon: 'fa-user' },
   ] as const;
 

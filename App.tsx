@@ -9,6 +9,7 @@ import MessagesView from './components/MessagesView';
 import DiscoveryView from './components/DiscoveryView';
 import LiveBroadcasterView from './components/LiveBroadcasterView';
 import AdminDashboard from './components/AdminDashboard';
+import StoreView from './components/StoreView';
 import BottomNav from './components/BottomNav';
 import { ViewType } from './types';
 
@@ -18,7 +19,7 @@ const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
-  const [user, setUser] = useState<{ name: string; email: string; bio?: string; avatar?: string; cover?: string } | null>(null);
+  const [user, setUser] = useState<{ name: string; email: string; bio?: string; avatar?: string; cover?: string; diamonds: number } | null>(null);
   const [currentView, setCurrentView] = useState<ViewType>('feed');
 
   // Load session from localStorage on mount
@@ -75,17 +76,18 @@ const App: React.FC = () => {
       loggedInUser = { 
         name: isAdminUser ? 'Wahab Fresh' : name, 
         email: isAdminUser ? 'admin@mydoll.club' : email, 
-        bio: "Master Node Administrator. System access granted." 
+        bio: "Master Node Administrator. System access granted.",
+        diamonds: 99999
       };
     } else {
-      loggedInUser = { name, email, bio: "Elite member and digital connoisseur." };
+      loggedInUser = { name, email, bio: "Elite member and digital connoisseur.", diamonds: 50 };
     }
     
     setUser(loggedInUser);
     setIsAuthenticated(true);
   };
 
-  const handleUpdateUser = (updatedData: Partial<{ name: string; email: string; bio?: string; avatar?: string; cover?: string }>) => {
+  const handleUpdateUser = (updatedData: Partial<{ name: string; email: string; bio?: string; avatar?: string; cover?: string; diamonds: number }>) => {
     setUser(prev => prev ? { ...prev, ...updatedData } : null);
   };
 
@@ -112,7 +114,7 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (currentView) {
       case 'profile':
-        return <ProfileView user={user!} onUpdate={handleUpdateUser} onBack={() => setCurrentView('feed')} />;
+        return <ProfileView user={user!} onUpdate={handleUpdateUser} onBack={() => setCurrentView('feed')} onNavigate={setCurrentView} />;
       case 'feed':
         return <FeedPage user={user!} />;
       case 'messages':
@@ -123,6 +125,8 @@ const App: React.FC = () => {
         return <LiveBroadcasterView />;
       case 'admin':
         return <AdminDashboard />;
+      case 'store':
+        return <StoreView diamonds={user?.diamonds || 0} onPurchase={(amount) => handleUpdateUser({ diamonds: (user?.diamonds || 0) + amount })} onBack={() => setCurrentView('feed')} />;
       default:
         return <FeedPage user={user!} />;
     }
