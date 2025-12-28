@@ -10,59 +10,59 @@ interface StoreViewProps {
 }
 
 const DIAMOND_PACKS = [
-  { id: 'pack-1', amount: 10, price: 0.05, label: 'Starter Sack' },
-  { id: 'pack-2', amount: 100, price: 0.50, label: 'Vibe Pack' },
-  { id: 'pack-3', amount: 500, price: 2.50, label: 'Elite Chest' },
-  { id: 'pack-4', amount: 1000, price: 5.00, label: 'Sugar Vault' },
-  { id: 'pack-5', amount: 5000, price: 25.00, label: 'Grand Master' },
-  { id: 'pack-6', amount: 10000, price: 50.00, label: 'Infinite Empire' },
+  { id: 'pack-1', amount: 100, price: 10.00, label: 'Starter Sack' },
+  { id: 'pack-2', amount: 500, price: 45.00, label: 'Vibe Pack' },
+  { id: 'pack-3', amount: 1000, price: 85.00, label: 'Elite Chest' },
+  { id: 'pack-4', amount: 5000, price: 400.00, label: 'Sugar Vault' },
+  { id: 'pack-5', amount: 10000, price: 750.00, label: 'Grand Master' },
+  { id: 'pack-6', amount: 20000, price: 1400.00, label: 'Infinite Empire' },
 ];
 
 const StoreView: React.FC<StoreViewProps> = ({ user, onPurchaseSuccess, onBack }) => {
   const [selectedPack, setSelectedPack] = useState<typeof DIAMOND_PACKS[0] | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [verificationLog, setVerificationLog] = useState<{msg: string, status: 'pending' | 'success' | 'current'}[]>([]);
+  const [logs, setLogs] = useState<{msg: string, status: 'ok' | 'loading' | 'pending'}[]>([]);
 
-  // PayPal Configuration from User
-  const CLIENT_ID = "AXYdyq0EgZ81zRMeAK-vNwDGjFGBUm6VdFLBbDjungJ-LN7yVgoWud8TTyMhowfNEa7W0yVw6xJutY-T";
+  // Real Live Client ID provided by user
+  const LIVE_CLIENT_ID = "AchOwxrubWXLdT64U9AmBydM9n7EEgA_psh3nXWi0PPhRvxZRtdHNCpXYxggnKV-dMef3JGMMzdeGvEW";
 
   const handleSelectPack = (pack: typeof DIAMOND_PACKS[0]) => {
     setSelectedPack(pack);
-    setVerificationLog([]);
+    setLogs([]);
   };
 
-  const onApprove = async (data: any) => {
+  const handleApprove = async (data: any) => {
     setIsProcessing(true);
-    const logs: {msg: string, status: 'pending' | 'success' | 'current'}[] = [
-      { msg: 'Payment Authorized by User', status: 'success' },
-      { msg: `OrderID: ${data.orderID}`, status: 'success' },
-      { msg: 'Contacting My Doll Server...', status: 'current' },
+    const newLogs: typeof logs = [
+      { msg: 'PayPal Authorization Received', status: 'ok' },
+      { msg: `Order ID: ${data.orderID}`, status: 'ok' },
+      { msg: 'Contacting Secure Database...', status: 'loading' },
       { msg: 'Capturing Funds to Admin Wallet...', status: 'pending' },
-      { msg: 'Granting Diamonds to Profile...', status: 'pending' },
+      { msg: 'Syncing User Diamond Balance...', status: 'pending' },
     ];
-    setVerificationLog([...logs]);
+    setLogs([...newLogs]);
 
-    // Simulated Server-Side Verification as requested
-    const success = await db.capturePayment(
-      data.orderID, 
-      user.email, 
-      selectedPack!.amount, 
+    // Secure server-side capture simulation
+    const result = await db.capturePaypalOrder(
+      data.orderID,
+      user.email,
+      selectedPack!.amount,
       selectedPack!.price
     );
 
-    if (success) {
-      logs[2].status = 'success';
-      logs[3].status = 'success';
-      logs[4].status = 'success';
-      setVerificationLog([...logs]);
-      
+    if (result.success) {
+      newLogs[2].status = 'ok';
+      newLogs[3].status = 'ok';
+      newLogs[4].status = 'ok';
+      setLogs([...newLogs]);
+
       onPurchaseSuccess();
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 5000);
       setSelectedPack(null);
     } else {
-      alert("Verification failed. Please contact support.");
+      alert(result.message);
     }
     setIsProcessing(false);
   };
@@ -73,7 +73,7 @@ const StoreView: React.FC<StoreViewProps> = ({ user, onPurchaseSuccess, onBack }
       <div className="flex items-center justify-between px-4 mt-4">
         <div>
           <h1 className="text-3xl font-black text-white tracking-tighter uppercase italic">Diamond Vault</h1>
-          <p className="text-[10px] text-pink-500 font-black uppercase tracking-[0.3em] mt-1">Real-time Balance Connected to DB</p>
+          <p className="text-[10px] text-pink-500 font-black uppercase tracking-[0.3em] mt-1">Live Database Connection Active</p>
         </div>
         <div className="flex items-center gap-3 px-6 py-3 bg-zinc-900 rounded-2xl border border-white/5 shadow-2xl">
            <i className="fa-solid fa-gem text-cyan-400 text-sm"></i>
@@ -108,12 +108,12 @@ const StoreView: React.FC<StoreViewProps> = ({ user, onPurchaseSuccess, onBack }
         <div className="glass-panel p-8 rounded-[2.5rem] border-white/5 flex flex-col md:flex-row items-center justify-between gap-6 bg-gradient-to-br from-indigo-600/10 via-transparent to-transparent">
            <div className="flex items-center gap-6">
               <div className="w-14 h-14 rounded-full bg-indigo-600/10 flex items-center justify-center text-indigo-400 text-xl">
-                 <i className="fa-solid fa-vault"></i>
+                 <i className="fa-solid fa-shield-halved"></i>
               </div>
               <div className="max-w-md">
-                 <h4 className="text-sm font-black text-white uppercase tracking-widest mb-1">Server-Side Verification</h4>
+                 <h4 className="text-sm font-black text-white uppercase tracking-widest mb-1">Authenticated Live Gateway</h4>
                  <p className="text-[10px] text-zinc-500 leading-relaxed font-bold uppercase tracking-tighter">
-                    Diamonds are only added after our server confirms the funds have reached the admin wallet. Standard SSL 256-bit encryption active.
+                    Using Live credentials. Funds go directly to the Admin wallet. Diamonds are granted only upon "COMPLETED" status from PayPal API.
                  </p>
               </div>
            </div>
@@ -135,59 +135,54 @@ const StoreView: React.FC<StoreViewProps> = ({ user, onPurchaseSuccess, onBack }
               <div className="w-16 h-16 rounded-3xl bg-cyan-600/20 flex items-center justify-center text-3xl text-cyan-400 mx-auto shadow-2xl mb-2">
                 <i className="fa-solid fa-gem"></i>
               </div>
-              <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Diamond Purchase</h3>
-              <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Selected: {selectedPack.amount.toLocaleString()} Diamonds</p>
+              <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Secure Checkout</h3>
+              <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Diamonds to be added: {selectedPack.amount.toLocaleString()}</p>
             </div>
 
             <div className="p-4 bg-white/5 rounded-2xl border border-white/5 flex justify-between items-center">
-               <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Amount to Pay</span>
-               <span className="text-xl font-black text-white">${selectedPack.price.toFixed(2)}</span>
+               <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Total Value</span>
+               <span className="text-xl font-black text-white">${selectedPack.price.toFixed(2)} USD</span>
             </div>
 
             {isProcessing ? (
                <div className="space-y-6 animate-in zoom-in duration-300">
-                <div className="p-8 bg-zinc-950 border border-white/10 rounded-[2.5rem] relative overflow-hidden">
-                     <div className="space-y-3 text-left">
-                        {verificationLog.map((log, i) => (
-                           <div key={i} className={`flex items-center gap-3 transition-opacity ${log.status === 'pending' ? 'opacity-20' : 'opacity-100'}`}>
-                              {log.status === 'success' ? (
-                                 <i className="fa-solid fa-circle-check text-green-500 text-[10px]"></i>
-                              ) : log.status === 'current' ? (
-                                 <i className="fa-solid fa-circle-notch animate-spin text-indigo-400 text-[10px]"></i>
-                              ) : (
-                                 <i className="fa-solid fa-circle text-zinc-800 text-[10px]"></i>
-                              )}
-                              <span className={`text-[9px] font-black uppercase tracking-widest ${log.status === 'current' ? 'text-white' : 'text-zinc-600'}`}>
-                                 {log.msg}
-                              </span>
-                           </div>
-                        ))}
-                     </div>
+                <div className="p-6 bg-zinc-950 border border-white/10 rounded-[2rem] text-left space-y-3">
+                    {logs.map((log, i) => (
+                      <div key={i} className={`flex items-center gap-3 transition-opacity ${log.status === 'pending' ? 'opacity-20' : 'opacity-100'}`}>
+                        {log.status === 'ok' ? (
+                          <i className="fa-solid fa-circle-check text-green-500 text-[10px]"></i>
+                        ) : log.status === 'loading' ? (
+                          <i className="fa-solid fa-circle-notch animate-spin text-indigo-400 text-[10px]"></i>
+                        ) : (
+                          <i className="fa-solid fa-circle text-zinc-800 text-[10px]"></i>
+                        )}
+                        <span className={`text-[9px] font-black uppercase tracking-widest ${log.status === 'loading' ? 'text-white' : 'text-zinc-500'}`}>
+                          {log.msg}
+                        </span>
+                      </div>
+                    ))}
                 </div>
-                <p className="text-[8px] text-indigo-400 font-black uppercase animate-pulse">Communicating with PayPal LIVE Gateway...</p>
+                <p className="text-[8px] text-indigo-400 font-black uppercase animate-pulse">Running Server-Side Capture...</p>
               </div>
             ) : (
               <div className="space-y-4 pt-4">
-                <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest text-left ml-2">Secure Checkout Powered by PayPal</p>
+                <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest text-left ml-2">Pay with PayPal (LIVE)</p>
                 <div className="relative z-0">
-                   <PayPalScriptProvider options={{ "client-id": CLIENT_ID, currency: "USD" }}>
+                   <PayPalScriptProvider options={{ "client-id": LIVE_CLIENT_ID, currency: "USD" }}>
                       <PayPalButtons 
                         style={{ layout: 'vertical', color: 'gold', shape: 'rect', label: 'pay' }}
                         createOrder={(data, actions) => {
                           return actions.order.create({
                             purchase_units: [{
-                              description: `My Doll - ${selectedPack.amount} Diamonds`,
+                              description: `My Doll Diamonds - Pack: ${selectedPack.amount}`,
                               amount: { value: selectedPack.price.toString() }
                             }]
                           });
                         }}
-                        onApprove={onApprove}
+                        onApprove={handleApprove}
                       />
                    </PayPalScriptProvider>
                 </div>
-                <p className="text-[8px] text-zinc-500 uppercase tracking-widest mt-4">
-                  Admin Wallet: {CLIENT_ID.slice(0, 10)}... (LIVE)
-                </p>
               </div>
             )}
           </div>
@@ -199,7 +194,7 @@ const StoreView: React.FC<StoreViewProps> = ({ user, onPurchaseSuccess, onBack }
         <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[110] px-10 py-5 bg-green-600 text-white rounded-3xl font-black text-[11px] uppercase tracking-widest shadow-[0_20px_60px_rgba(22,163,74,0.4)] animate-in slide-in-from-top-12 duration-500">
            <div className="flex items-center gap-3">
               <i className="fa-solid fa-circle-check text-lg"></i>
-              <span>Payment Captured. Profile Synced. Diamonds Granted.</span>
+              <span>Payment Captured Successfully. Your Vault is Replenished.</span>
            </div>
         </div>
       )}

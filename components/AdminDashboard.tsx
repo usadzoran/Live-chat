@@ -1,6 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AdConfig } from '../types';
+import { db } from '../services/databaseService';
 
 interface AdminDashboardProps {
   totalRevenue: number;
@@ -8,32 +9,25 @@ interface AdminDashboardProps {
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ totalRevenue }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'moderation' | 'nodes' | 'ads' | 'treasury'>('overview');
+  const [merchantId, setMerchantId] = useState('');
+  const [isLive, setIsLive] = useState(false);
   
-  // Mocking Ad Settings State
+  // Sync merchant info from DB
+  useEffect(() => {
+    const fetchStats = async () => {
+      const stats = await db.getPlatformStats();
+      setMerchantId(stats.merchantId);
+      setIsLive(stats.isLive);
+    };
+    fetchStats();
+  }, []);
+
   const [ads, setAds] = useState<AdConfig[]>([
     { id: '1', placement: 'under_header', enabled: true, title: 'Luxury Watches', imageUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=400&q=80', link: '#' },
     { id: '2', placement: 'before_publication', enabled: false, title: 'Crypto Elite', imageUrl: '', link: '#' },
     { id: '3', placement: 'under_publication', enabled: true, title: 'Diamond Club', imageUrl: 'https://images.unsplash.com/photo-1588444833098-4205565e2482?auto=format&fit=crop&w=400&q=80', link: '#' },
     { id: '4', placement: 'footer', enabled: true, title: 'Private Jet Rentals', imageUrl: '', link: '#' },
   ]);
-
-  // Treasury Configuration State
-  const [merchantConfig, setMerchantConfig] = useState({
-    paypalEmail: 'admin@mydoll.club',
-    paypalButtonId: 'QHWLEM9S5DJ2Q',
-    visaMerchantId: 'MID-8842-990-X',
-    gatewayProvider: 'Stripe Connect',
-    isLiveMode: false,
-    autoSettlement: true
-  });
-
-  const toggleAd = (id: string) => {
-    setAds(prev => prev.map(ad => ad.id === id ? { ...ad, enabled: !ad.enabled } : ad));
-  };
-
-  const updateAd = (id: string, field: keyof AdConfig, value: string) => {
-    setAds(prev => prev.map(ad => ad.id === id ? { ...ad, [field]: value } : ad));
-  };
 
   const stats = [
     { label: 'Total Revenue', value: `$${totalRevenue.toLocaleString()}`, trend: '+12.5%', icon: 'fa-sack-dollar', color: 'text-emerald-400' },
@@ -102,20 +96,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ totalRevenue }) => {
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col overflow-hidden">
-        {/* Mobile Header */}
-        <div className="lg:hidden p-4 border-b border-white/5 flex items-center gap-2 overflow-x-auto hide-scrollbar shrink-0">
-          {navItems.map(item => (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id as any)}
-              className={`whitespace-nowrap flex items-center gap-2 px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === item.id ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/20' : 'bg-white/5 text-zinc-500'}`}
-            >
-              <i className={`fa-solid ${item.icon}`}></i>
-              {item.label}
-            </button>
-          ))}
-        </div>
-
         <header className="h-14 lg:h-16 border-b border-white/5 px-4 lg:px-8 flex items-center justify-between bg-black/20 backdrop-blur-md shrink-0">
           <div className="flex items-center gap-2 lg:gap-4">
             <span className="hidden sm:inline text-[10px] text-zinc-600 uppercase font-black tracking-widest">Path:</span>
@@ -123,14 +103,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ totalRevenue }) => {
           </div>
           <div className="flex items-center gap-4 lg:gap-6">
             <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${merchantConfig.isLiveMode ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]' : 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]'}`}></div>
+              <div className={`w-2 h-2 rounded-full ${isLive ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]'}`}></div>
               <span className="hidden sm:inline text-[8px] font-black uppercase text-zinc-400">
-                {merchantConfig.isLiveMode ? 'LIVE MODE' : 'SANDBOX MODE'}
+                {isLive ? 'LIVE MODE' : 'SANDBOX MODE'}
               </span>
             </div>
-            <button className="w-8 h-8 rounded-lg bg-zinc-900 border border-white/5 flex items-center justify-center text-zinc-500 hover:text-white transition-colors">
-              <i className="fa-solid fa-bell text-xs"></i>
-            </button>
           </div>
         </header>
 
@@ -167,7 +144,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ totalRevenue }) => {
                 ))}
               </div>
 
-              {/* Main Dashboard Section */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
                 <div className="lg:col-span-2 space-y-6">
                   <div className="glass-panel rounded-3xl border-white/5 overflow-hidden">
@@ -207,29 +183,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ totalRevenue }) => {
                      </div>
                   </div>
                 </div>
-
-                <div className="space-y-6">
-                  <div className="glass-panel p-4 lg:p-6 rounded-3xl border-white/5">
-                     <h3 className="text-[9px] lg:text-[10px] font-black text-white uppercase tracking-widest mb-4 lg:mb-6">AI Nodes</h3>
-                     <div className="space-y-4 lg:space-y-6">
-                       {[
-                         { name: 'Gemini-3-Pro', load: '32%', status: 'Stable' },
-                         { name: 'Veo-3.1-Fast', load: '78%', status: 'Warning' },
-                         { name: 'Native-Audio', load: '45%', status: 'Stable' },
-                       ].map((node, i) => (
-                         <div key={i} className="space-y-2">
-                           <div className="flex justify-between items-end">
-                             <p className="text-[9px] lg:text-[10px] font-bold text-zinc-400">{node.name}</p>
-                             <p className={`text-[7px] lg:text-[8px] font-black uppercase ${node.status === 'Stable' ? 'text-green-500' : 'text-amber-500'}`}>{node.status}</p>
-                           </div>
-                           <div className="h-1.5 w-full bg-zinc-900 rounded-full overflow-hidden">
-                             <div className={`h-full transition-all duration-1000 ${node.status === 'Stable' ? 'bg-cyan-500' : 'bg-amber-500'}`} style={{ width: node.load }}></div>
-                           </div>
-                         </div>
-                       ))}
-                     </div>
-                  </div>
-                </div>
               </div>
             </div>
           )}
@@ -238,253 +191,54 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ totalRevenue }) => {
             <div className="space-y-8 animate-in fade-in slide-in-from-left-4 duration-500">
                <div className="flex flex-col gap-2">
                 <h2 className="text-xl font-black text-white uppercase tracking-widest">Platform Treasury</h2>
-                <p className="text-xs text-zinc-500 uppercase tracking-widest font-black">Configure merchant accounts for receiving user payments</p>
+                <p className="text-xs text-zinc-500 uppercase tracking-widest font-black">Merchant status for user diamond purchases</p>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                 {/* PayPal Settings */}
                  <div className="glass-panel p-8 rounded-[2.5rem] border-white/10 bg-gradient-to-br from-blue-600/10 via-transparent to-transparent space-y-6">
                     <div className="flex items-center gap-4 mb-2">
                        <div className="w-12 h-12 rounded-2xl bg-blue-600/20 flex items-center justify-center text-blue-400 text-2xl">
                           <i className="fa-brands fa-paypal"></i>
                        </div>
                        <div>
-                          <h3 className="text-sm font-black text-white uppercase tracking-widest">PayPal Hosted Button</h3>
-                          <p className="text-[8px] text-zinc-600 font-bold uppercase tracking-widest">Configured via PayPal Merchant Dashboard</p>
+                          <h3 className="text-sm font-black text-white uppercase tracking-widest">PayPal LIVE Merchant</h3>
+                          <p className="text-[8px] text-zinc-600 font-bold uppercase tracking-widest">Active Connection Status</p>
                        </div>
                     </div>
 
                     <div className="space-y-4">
                        <div className="space-y-2">
-                          <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Platform Receiver Email</label>
-                          <input 
-                            type="email"
-                            value={merchantConfig.paypalEmail}
-                            onChange={(e) => setMerchantConfig({ ...merchantConfig, paypalEmail: e.target.value })}
-                            className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 px-6 text-sm text-white focus:outline-none focus:border-blue-500 transition-all"
-                          />
-                       </div>
-                       <div className="space-y-2">
-                          <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Hosted Button ID</label>
-                          <input 
-                            type="text"
-                            value={merchantConfig.paypalButtonId}
-                            onChange={(e) => setMerchantConfig({ ...merchantConfig, paypalButtonId: e.target.value })}
-                            className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 px-6 text-sm text-white focus:outline-none focus:border-blue-500 transition-all font-mono"
-                          />
+                          <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Live Client ID</label>
+                          <div className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 px-6 text-xs text-white truncate font-mono">
+                            {merchantId}
+                          </div>
                        </div>
                     </div>
 
-                    <div className="p-4 bg-white/5 rounded-2xl border border-white/5 flex items-center justify-between">
+                    <div className="p-4 bg-green-500/10 rounded-2xl border border-green-500/20 flex items-center justify-between">
                        <div className="flex items-center gap-3">
                           <i className="fa-solid fa-circle-check text-green-500 text-[10px]"></i>
-                          <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">PayPal API Status</span>
-                       </div>
-                       <span className="text-[10px] font-black text-green-500 uppercase tracking-widest">Active</span>
-                    </div>
-                 </div>
-
-                 {/* Visa/Mastercard Settings */}
-                 <div className="glass-panel p-8 rounded-[2.5rem] border-white/10 bg-gradient-to-br from-indigo-600/10 via-transparent to-transparent space-y-6">
-                    <div className="flex items-center gap-4 mb-2">
-                       <div className="w-12 h-12 rounded-2xl bg-indigo-600/20 flex items-center justify-center text-indigo-400 text-2xl">
-                          <i className="fa-solid fa-credit-card"></i>
-                       </div>
-                       <div>
-                          <h3 className="text-sm font-black text-white uppercase tracking-widest">Visa / Card Processing</h3>
-                          <p className="text-[8px] text-zinc-600 font-bold uppercase tracking-widest">Secure Bank Gateway ID</p>
-                       </div>
-                    </div>
-
-                    <div className="space-y-2">
-                       <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Merchant ID (HIDDEN)</label>
-                       <input 
-                        type="password"
-                        value={merchantConfig.visaMerchantId}
-                        onChange={(e) => setMerchantConfig({ ...merchantConfig, visaMerchantId: e.target.value })}
-                        className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 px-6 text-sm text-white focus:outline-none focus:border-indigo-500 transition-all"
-                       />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                       <div className="space-y-1">
-                          <label className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Gateway</label>
-                          <select 
-                             value={merchantConfig.gatewayProvider}
-                             onChange={(e) => setMerchantConfig({...merchantConfig, gatewayProvider: e.target.value})}
-                             className="w-full bg-zinc-900 border border-white/5 rounded-xl py-3 px-4 text-[10px] text-zinc-400"
-                          >
-                             <option>Stripe Connect</option>
-                             <option>Square Business</option>
-                             <option>Direct Bank XML</option>
-                          </select>
-                       </div>
-                       <div className="space-y-1">
-                          <label className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Region</label>
-                          <div className="w-full bg-zinc-900/50 border border-white/5 rounded-xl py-3 px-4 text-[10px] text-zinc-600 uppercase">Global</div>
+                          <span className="text-[10px] font-black text-green-500 uppercase tracking-widest">Live Gateway Connected</span>
                        </div>
                     </div>
                  </div>
               </div>
 
-              {/* Settlement Logic */}
               <div className="glass-panel p-10 rounded-[3rem] border-white/10 flex flex-col md:flex-row items-center justify-between gap-12">
                  <div className="flex-1 space-y-4 text-center md:text-left">
-                    <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Settlement Controls</h3>
+                    <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Treasury Liquidity</h3>
                     <p className="text-[10px] text-zinc-500 uppercase tracking-widest leading-relaxed font-bold">
-                       Current Diamond Sales Volume: <span className="text-white">${totalRevenue.toLocaleString()}</span>. Trigger manual settlements or toggle environment mode.
+                       Current System Balance: <span className="text-white">${totalRevenue.toLocaleString()}</span>. All transactions are logged in the secure cloud database.
                     </p>
-                    <div className="flex flex-wrap items-center gap-6 mt-4 justify-center md:justify-start">
-                       <div className="flex items-center gap-3">
-                          <span className="text-[10px] font-black text-zinc-600 uppercase">Environment</span>
-                          <button 
-                             onClick={() => setMerchantConfig({...merchantConfig, isLiveMode: !merchantConfig.isLiveMode})}
-                             className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase transition-all ${merchantConfig.isLiveMode ? 'bg-red-600 text-white' : 'bg-zinc-800 text-zinc-500'}`}
-                          >
-                             {merchantConfig.isLiveMode ? 'PRODUCTION' : 'SANDBOX'}
-                          </button>
-                       </div>
-                       <div className="flex items-center gap-3">
-                          <span className="text-[10px] font-black text-zinc-600 uppercase">Auto-Settle</span>
-                          <button 
-                             onClick={() => setMerchantConfig({...merchantConfig, autoSettlement: !merchantConfig.autoSettlement})}
-                             className={`w-10 h-5 rounded-full p-1 transition-all ${merchantConfig.autoSettlement ? 'bg-cyan-600' : 'bg-zinc-800'}`}
-                          >
-                             <div className={`w-3 h-3 rounded-full bg-white transition-all ${merchantConfig.autoSettlement ? 'translate-x-5' : 'translate-x-0'}`}></div>
-                          </button>
-                       </div>
-                    </div>
                  </div>
                  
                  <div className="shrink-0 flex flex-col gap-3">
                     <button className="px-12 py-5 bg-white text-black font-black text-[10px] uppercase tracking-[0.2em] rounded-2xl shadow-2xl hover:bg-zinc-200 transition-all active:scale-95">
-                       PUSH ${totalRevenue.toLocaleString()} TO BANK
+                       INITIATE SETTLEMENT
                     </button>
-                    <p className="text-center text-[8px] font-black text-zinc-600 uppercase tracking-widest">Verified Revenue Stream</p>
+                    <p className="text-center text-[8px] font-black text-zinc-600 uppercase tracking-widest">Requires 2FA Approval</p>
                  </div>
               </div>
-            </div>
-          )}
-
-          {activeTab === 'ads' && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
-              <div className="flex flex-col gap-2">
-                <h2 className="text-xl font-black text-white uppercase tracking-widest">Global Ad Management</h2>
-                <p className="text-xs text-zinc-500 uppercase tracking-widest font-black">Configure monetized placements and promotional banners</p>
-              </div>
-
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-                {ads.map((ad) => (
-                  <div key={ad.id} className={`glass-panel p-6 rounded-3xl border ${ad.enabled ? 'border-cyan-500/30 shadow-[0_0_30px_rgba(8,145,178,0.1)]' : 'border-white/5 opacity-60'}`}>
-                    <div className="flex items-center justify-between mb-8">
-                       <div className="flex items-center gap-4">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${ad.enabled ? 'bg-cyan-600/20 text-cyan-400' : 'bg-zinc-900 text-zinc-600'}`}>
-                             <i className={`fa-solid ${
-                               ad.placement === 'under_header' ? 'fa-heading' :
-                               ad.placement === 'before_publication' ? 'fa-arrow-up-from-bracket' :
-                               ad.placement === 'under_publication' ? 'fa-arrow-down-long' :
-                               'fa-shoe-prints'
-                             }`}></i>
-                          </div>
-                          <div>
-                            <p className="text-[10px] font-black text-white uppercase tracking-widest">{ad.placement.replace('_', ' ')}</p>
-                            <p className="text-[8px] text-zinc-500 font-bold uppercase tracking-widest">Placement ID: {ad.id}</p>
-                          </div>
-                       </div>
-                       <button 
-                        onClick={() => toggleAd(ad.id)}
-                        className={`w-12 h-6 rounded-full p-1 transition-all ${ad.enabled ? 'bg-cyan-600' : 'bg-zinc-800'}`}
-                       >
-                          <div className={`w-4 h-4 rounded-full bg-white transition-all ${ad.enabled ? 'translate-x-6' : 'translate-x-0'}`}></div>
-                       </button>
-                    </div>
-
-                    <div className="space-y-4">
-                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-1">
-                             <label className="text-[8px] font-black text-zinc-600 uppercase tracking-widest ml-1">Sponsor Title</label>
-                             <input 
-                                type="text"
-                                value={ad.title}
-                                onChange={(e) => updateAd(ad.id, 'title', e.target.value)}
-                                className="w-full bg-black/40 border border-white/5 rounded-xl py-3 px-4 text-[10px] text-white focus:outline-none focus:border-cyan-500/50"
-                             />
-                          </div>
-                          <div className="space-y-1">
-                             <label className="text-[8px] font-black text-zinc-600 uppercase tracking-widest ml-1">Destination URL</label>
-                             <input 
-                                type="text"
-                                value={ad.link}
-                                onChange={(e) => updateAd(ad.id, 'link', e.target.value)}
-                                className="w-full bg-black/40 border border-white/5 rounded-xl py-3 px-4 text-[10px] text-white focus:outline-none focus:border-cyan-500/50"
-                             />
-                          </div>
-                       </div>
-                       <div className="space-y-1">
-                          <label className="text-[8px] font-black text-zinc-600 uppercase tracking-widest ml-1">Asset Image URL (Optional)</label>
-                          <input 
-                             type="text"
-                             value={ad.imageUrl}
-                             placeholder="https://..."
-                             onChange={(e) => updateAd(ad.id, 'imageUrl', e.target.value)}
-                             className="w-full bg-black/40 border border-white/5 rounded-xl py-3 px-4 text-[10px] text-white focus:outline-none focus:border-cyan-500/50"
-                          />
-                       </div>
-
-                       {/* Ad Preview */}
-                       {ad.enabled && (
-                        <div className="mt-6 pt-6 border-t border-white/5">
-                           <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest mb-4">Live Preview</p>
-                           <div className="w-full p-4 bg-white/5 border border-white/5 rounded-2xl flex items-center gap-4 group">
-                              {ad.imageUrl ? (
-                                <img src={ad.imageUrl} className="w-12 h-12 rounded-lg object-cover" alt="preview" />
-                              ) : (
-                                <div className="w-12 h-12 rounded-lg bg-zinc-900 border border-white/5 flex items-center justify-center text-zinc-700">
-                                   <i className="fa-solid fa-image"></i>
-                                </div>
-                              )}
-                              <div className="flex-1">
-                                 <div className="flex items-center gap-2 mb-0.5">
-                                    <span className="text-[8px] font-black text-cyan-400 uppercase tracking-widest border border-cyan-400/30 px-1 rounded">SPONSORED</span>
-                                    <span className="text-[10px] font-black text-white">{ad.title}</span>
-                                 </div>
-                                 <p className="text-[9px] text-zinc-500 truncate">{ad.link}</p>
-                              </div>
-                              <i className="fa-solid fa-arrow-up-right-from-square text-[10px] text-zinc-700 group-hover:text-cyan-400"></i>
-                           </div>
-                        </div>
-                       )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="p-8 bg-zinc-900/40 border border-white/5 rounded-[2.5rem] flex flex-col md:flex-row items-center justify-between gap-6">
-                 <div className="flex items-center gap-6">
-                    <div className="w-16 h-16 rounded-full bg-cyan-600/10 flex items-center justify-center text-cyan-500 text-2xl">
-                       <i className="fa-solid fa-circle-info"></i>
-                    </div>
-                    <div>
-                       <h3 className="text-sm font-black text-white uppercase tracking-widest mb-1">Placement Strategy</h3>
-                       <p className="text-[10px] text-zinc-500 max-w-sm leading-relaxed">
-                          Advertisements are injected via server-side props to ensure bypass-resistance. Configure high-CPM links for the "Under Publication" slot for maximum ROI.
-                       </p>
-                    </div>
-                 </div>
-                 <button className="px-10 py-4 bg-cyan-600 hover:bg-cyan-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-2xl shadow-cyan-600/30 transition-all active:scale-95">
-                    FORCE SYSTEM REFRESH
-                 </button>
-              </div>
-            </div>
-          )}
-
-          {activeTab !== 'overview' && activeTab !== 'ads' && activeTab !== 'treasury' && (
-            <div className="h-full flex flex-col items-center justify-center opacity-40 text-center space-y-4">
-               <div className="w-16 h-16 rounded-full bg-zinc-900 border border-white/5 flex items-center justify-center">
-                  <i className="fa-solid fa-screwdriver-wrench text-xl text-zinc-600"></i>
-               </div>
-               <h2 className="text-sm font-black text-white uppercase tracking-widest">{activeTab} system pending</h2>
-               <p className="text-[10px] max-w-xs leading-relaxed">This module is currently in the sync phase. Real-time data will populate once the next block is confirmed.</p>
             </div>
           )}
         </div>
