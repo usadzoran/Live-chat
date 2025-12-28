@@ -54,7 +54,7 @@ export interface Gift {
   color: string;
 }
 
-export type ViewType = 'profile' | 'feed' | 'messages' | 'discovery' | 'live' | 'admin' | 'store';
+export type ViewType = 'profile' | 'feed' | 'messages' | 'discovery' | 'live' | 'admin' | 'store' | 'wallet';
 
 export interface PayoutSettings {
   method: 'paypal' | 'card' | null;
@@ -62,6 +62,15 @@ export interface PayoutSettings {
   cardNumber: string;
   cardExpiry: string;
   cardHolder: string;
+}
+
+export interface WithdrawalRecord {
+  id: string;
+  amountUsd: number;
+  gemsConverted: number;
+  paypalEmail: string;
+  status: 'pending' | 'completed' | 'failed';
+  timestamp: Date;
 }
 
 export interface Comment {

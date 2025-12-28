@@ -50,11 +50,14 @@ const App: React.FC = () => {
     
     let u = await db.getUser(email);
     if (!u) {
+      // Added missing mandatory properties for UserDB: usd_balance and withdrawals
       u = await db.upsertUser({ 
         name, 
         email, 
         diamonds: isAdminUser ? 99999 : 50,
-        bio: isAdminUser ? "Master Node Administrator" : "Elite member"
+        bio: isAdminUser ? "Master Node Administrator" : "Elite member",
+        usd_balance: 0,
+        withdrawals: []
       });
     }
 

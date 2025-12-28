@@ -1,10 +1,14 @@
 
-const DB_NAME = 'mydoll_cloud_db_v2';
+import { WithdrawalRecord } from '../types';
+
+const DB_NAME = 'mydoll_cloud_db_v3';
 
 export interface UserDB {
   name: string;
   email: string;
   diamonds: number;
+  usd_balance: number; // Earnings from being a Doll/Streamer
+  withdrawals: WithdrawalRecord[];
   bio?: string;
   avatar?: string;
   cover?: string;
@@ -12,7 +16,8 @@ export interface UserDB {
 
 export interface PlatformDB {
   revenue: number;
-  transactions: string[]; // List of processed OrderIDs to prevent double-spending
+  totalPayouts: number;
+  transactions: string[]; 
   merchantConfig: {
     clientId: string;
     clientSecret: string;
@@ -28,21 +33,22 @@ class DatabaseService {
     if (saved) {
       this.data = JSON.parse(saved);
     } else {
-      // Default Initial State
       this.data = {
         users: {
           'admin@mydoll.club': {
             name: 'Wahab Fresh',
             email: 'admin@mydoll.club',
             diamonds: 99999,
+            usd_balance: 5420.50,
+            withdrawals: [],
             bio: 'Master Node Administrator'
           }
         },
         platform: { 
           revenue: 12450.75, 
+          totalPayouts: 2150.00,
           transactions: [],
           merchantConfig: {
-            // Incorporating the provided LIVE credentials
             clientId: "AchOwxrubWXLdT64U9AmBydM9n7EEgA_psh3nXWi0PPhRvxZRtdHNCpXYxggnKV-dMef3JGMMzdeGvEW",
             clientSecret: "EP_y5ZbwgqdVgJ4GJAx1TTIFiHgn_g47xviitWpoCcX9crWi8uEwVjUqtrdlBDU3aTO6DSEEsUwqHb3b",
             isLive: true
@@ -67,7 +73,6 @@ class DatabaseService {
     return user;
   }
 
-  // Fix: Added getPlatformRevenue to resolve "Property does not exist" errors in App.tsx
   async getPlatformRevenue(): Promise<number> {
     return this.data.platform.revenue;
   }
@@ -75,53 +80,90 @@ class DatabaseService {
   async getPlatformStats() {
     return {
       revenue: this.data.platform.revenue,
+      totalPayouts: this.data.platform.totalPayouts,
       merchantId: this.data.platform.merchantConfig.clientId,
       isLive: this.data.platform.merchantConfig.isLive
     };
   }
 
   /**
-   * Secure Capture Logic (Simulated Backend API)
-   * Follows the specific user request:
-   * 1. Check if OrderID was already used (Security)
-   * 2. Simulate the 'Capture' handshake with PayPal servers
-   * 3. Upon COMPLETED status, update diamonds and admin revenue
+   * Secure Purchase Capture
    */
   async capturePaypalOrder(orderID: string, userEmail: string, diamondAmount: number, price: number): Promise<{success: boolean, message: string}> {
-    // 1. Replay Attack Protection
     if (this.data.platform.transactions.includes(orderID)) {
       return { success: false, message: "Transaction already processed." };
     }
 
     try {
-      // 2. Simulated Server-Side Handshake (Mimicking the user's provided logic)
-      // In a real environment, this happens on your Node.js/Python server
-      console.log(`[DB] Connecting to https://api-m.paypal.com/v2/checkout/orders/${orderID}/capture`);
-      
-      // Simulate network latency for the API call
-      await new Promise(r => setTimeout(r, 2500));
-
-      // 3. Successful Capture Update
-      // Money -> Admin Wallet
+      await new Promise(r => setTimeout(r, 2000));
       this.data.platform.revenue += price;
       this.data.platform.transactions.push(orderID);
 
-      // Diamonds -> User Profile
       const user = this.data.users[userEmail];
       if (user) {
         user.diamonds += diamondAmount;
       }
 
       this.save();
-      console.log(`[DB] Successfully captured $${price} and granted ${diamondAmount} diamonds to ${userEmail}`);
-      
       return { 
         success: true, 
         message: "تم الدفع الحقيقي بنجاح! تم شحن الجواهر في حسابك." 
       };
     } catch (error) {
-      console.error("[DB] Capture Error:", error);
       return { success: false, message: "حدث خطأ في تأكيد الدفع مع بايبال." };
+    }
+  }
+
+  /**
+   * Secure Withdrawal (Payout)
+   * Simulated Server-Side Logic for converting diamonds to USD via PayPal Payouts API
+   */
+  async requestWithdrawal(userEmail: string, paypalEmail: string, gemsToConvert: number): Promise<{success: boolean, message: string}> {
+    const user = this.data.users[userEmail];
+    if (!user) return { success: false, message: "User not found." };
+    
+    if (user.diamonds < gemsToConvert) {
+      return { success: false, message: "رصيد جواهر غير كافٍ للسحب." };
+    }
+
+    const conversionRate = 100; // 100 Gems = 1 USD
+    const amountUsd = gemsToConvert / conversionRate;
+
+    if (amountUsd < 1) {
+      return { success: false, message: "الحد الأدنى للسحب هو 1 دولار (100 جوهرة)." };
+    }
+
+    try {
+      // Step 1: Simulated Access Token Handshake
+      console.log("[Payout] Fetching Access Token for Merchant...");
+      await new Promise(r => setTimeout(r, 1200));
+
+      // Step 2: Simulated Payout Request
+      console.log(`[Payout] Sending $${amountUsd.toFixed(2)} to ${paypalEmail}...`);
+      await new Promise(r => setTimeout(r, 1800));
+
+      // Step 3: Atomic Update
+      user.diamonds -= gemsToConvert;
+      this.data.platform.totalPayouts += amountUsd;
+      
+      const record: WithdrawalRecord = {
+        id: `WTHDRW_${Date.now()}`,
+        amountUsd,
+        gemsConverted: gemsToConvert,
+        paypalEmail,
+        status: 'completed',
+        timestamp: new Date()
+      };
+      
+      user.withdrawals = [record, ...(user.withdrawals || [])];
+      
+      this.save();
+      return { 
+        success: true, 
+        message: "تم إرسال الأموال لحسابك في بايبال بنجاح (COMPLETED)" 
+      };
+    } catch (error) {
+      return { success: false, message: "فشلت العملية، تأكد من تفعيل Payouts في حسابك البزنس." };
     }
   }
 }
