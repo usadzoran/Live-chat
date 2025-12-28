@@ -10,12 +10,12 @@ interface StoreViewProps {
 }
 
 const DIAMOND_PACKS = [
-  { id: 'pack-1', amount: 100, price: 10.00, label: 'Starter Sack' },
-  { id: 'pack-2', amount: 500, price: 45.00, label: 'Vibe Pack' },
-  { id: 'pack-3', amount: 1000, price: 85.00, label: 'Elite Chest' },
-  { id: 'pack-4', amount: 5000, price: 400.00, label: 'Sugar Vault' },
-  { id: 'pack-5', amount: 10000, price: 750.00, label: 'Grand Master' },
-  { id: 'pack-6', amount: 20000, price: 1400.00, label: 'Infinite Empire' },
+  { id: 'pack-1', amount: 10, price: 0.50, label: 'Pocket Sack' },
+  { id: 'pack-2', amount: 50, price: 2.50, label: 'Starter Pack' },
+  { id: 'pack-3', amount: 100, price: 5.00, label: 'Vibe Chest' },
+  { id: 'pack-4', amount: 500, price: 25.00, label: 'Elite Vault' },
+  { id: 'pack-5', amount: 1000, price: 50.00, label: 'Sugar Master' },
+  { id: 'pack-6', amount: 5000, price: 250.00, label: 'Infinite Empire' },
 ];
 
 const StoreView: React.FC<StoreViewProps> = ({ user, onPurchaseSuccess, onBack }) => {
@@ -39,7 +39,7 @@ const StoreView: React.FC<StoreViewProps> = ({ user, onPurchaseSuccess, onBack }
       { msg: `Order ID: ${data.orderID}`, status: 'ok' },
       { msg: 'Contacting Secure Database...', status: 'loading' },
       { msg: 'Capturing Funds to Admin Wallet...', status: 'pending' },
-      { msg: 'Syncing User Diamond Balance...', status: 'pending' },
+      { msg: 'Syncing User Gem Balance...', status: 'pending' },
     ];
     setLogs([...newLogs]);
 
@@ -72,7 +72,7 @@ const StoreView: React.FC<StoreViewProps> = ({ user, onPurchaseSuccess, onBack }
       {/* Vault Balance Display */}
       <div className="flex items-center justify-between px-4 mt-4">
         <div>
-          <h1 className="text-3xl font-black text-white tracking-tighter uppercase italic">Diamond Vault</h1>
+          <h1 className="text-3xl font-black text-white tracking-tighter uppercase italic">Gem Vault</h1>
           <p className="text-[10px] text-pink-500 font-black uppercase tracking-[0.3em] mt-1">Live Database Connection Active</p>
         </div>
         <div className="flex items-center gap-3 px-6 py-3 bg-zinc-900 rounded-2xl border border-white/5 shadow-2xl">
@@ -113,7 +113,7 @@ const StoreView: React.FC<StoreViewProps> = ({ user, onPurchaseSuccess, onBack }
               <div className="max-w-md">
                  <h4 className="text-sm font-black text-white uppercase tracking-widest mb-1">Authenticated Live Gateway</h4>
                  <p className="text-[10px] text-zinc-500 leading-relaxed font-bold uppercase tracking-tighter">
-                    Using Live credentials. Funds go directly to the Admin wallet. Diamonds are granted only upon "COMPLETED" status from PayPal API.
+                    Using Live credentials. Funds go directly to the Admin wallet. Gems are granted only upon "COMPLETED" status from PayPal API.
                  </p>
               </div>
            </div>
@@ -136,7 +136,7 @@ const StoreView: React.FC<StoreViewProps> = ({ user, onPurchaseSuccess, onBack }
                 <i className="fa-solid fa-gem"></i>
               </div>
               <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Secure Checkout</h3>
-              <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Diamonds to be added: {selectedPack.amount.toLocaleString()}</p>
+              <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Gems to be added: {selectedPack.amount.toLocaleString()}</p>
             </div>
 
             <div className="p-4 bg-white/5 rounded-2xl border border-white/5 flex justify-between items-center">
@@ -174,7 +174,7 @@ const StoreView: React.FC<StoreViewProps> = ({ user, onPurchaseSuccess, onBack }
                         createOrder={(data, actions) => {
                           return actions.order.create({
                             purchase_units: [{
-                              description: `My Doll Diamonds - Pack: ${selectedPack.amount}`,
+                              description: `My Doll Gems - Pack: ${selectedPack.amount}`,
                               amount: { value: selectedPack.price.toString() }
                             }]
                           });
