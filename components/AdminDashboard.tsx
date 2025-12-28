@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { AdConfig } from '../types';
 
 const AdminDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'moderation' | 'nodes' | 'ads'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'moderation' | 'nodes' | 'ads' | 'treasury'>('overview');
   
   // Mocking Ad Settings State
   const [ads, setAds] = useState<AdConfig[]>([
@@ -12,6 +12,15 @@ const AdminDashboard: React.FC = () => {
     { id: '3', placement: 'under_publication', enabled: true, title: 'Diamond Club', imageUrl: 'https://images.unsplash.com/photo-1588444833098-4205565e2482?auto=format&fit=crop&w=400&q=80', link: '#' },
     { id: '4', placement: 'footer', enabled: true, title: 'Private Jet Rentals', imageUrl: '', link: '#' },
   ]);
+
+  // Treasury Configuration State
+  const [merchantConfig, setMerchantConfig] = useState({
+    paypalEmail: 'admin@mydoll.club',
+    visaMerchantId: 'MID-8842-990-X',
+    gatewayProvider: 'Stripe Connect',
+    isLiveMode: false,
+    autoSettlement: true
+  });
 
   const toggleAd = (id: string) => {
     setAds(prev => prev.map(ad => ad.id === id ? { ...ad, enabled: !ad.enabled } : ad));
@@ -38,6 +47,7 @@ const AdminDashboard: React.FC = () => {
   const navItems = [
     { id: 'overview', label: 'Command Center', icon: 'fa-chart-pie' },
     { id: 'users', label: 'User Directory', icon: 'fa-users-gear' },
+    { id: 'treasury', label: 'Treasury (Fin)', icon: 'fa-vault' },
     { id: 'moderation', label: 'Moderation Q', icon: 'fa-user-shield' },
     { id: 'ads', label: 'Ad Management', icon: 'fa-rectangle-ad' },
     { id: 'nodes', label: 'AI Infrastructure', icon: 'fa-server' },
@@ -108,8 +118,10 @@ const AdminDashboard: React.FC = () => {
           </div>
           <div className="flex items-center gap-4 lg:gap-6">
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
-              <span className="hidden sm:inline text-[8px] font-black uppercase text-zinc-400">System Nominal</span>
+              <div className={`w-2 h-2 rounded-full ${merchantConfig.isLiveMode ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]' : 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]'}`}></div>
+              <span className="hidden sm:inline text-[8px] font-black uppercase text-zinc-400">
+                {merchantConfig.isLiveMode ? 'LIVE MODE' : 'SANDBOX MODE'}
+              </span>
             </div>
             <button className="w-8 h-8 rounded-lg bg-zinc-900 border border-white/5 flex items-center justify-center text-zinc-500 hover:text-white transition-colors">
               <i className="fa-solid fa-bell text-xs"></i>
@@ -213,6 +225,127 @@ const AdminDashboard: React.FC = () => {
                      </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'treasury' && (
+            <div className="space-y-8 animate-in fade-in slide-in-from-left-4 duration-500">
+               <div className="flex flex-col gap-2">
+                <h2 className="text-xl font-black text-white uppercase tracking-widest">Platform Treasury</h2>
+                <p className="text-xs text-zinc-500 uppercase tracking-widest font-black">Configure merchant accounts for receiving user payments</p>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                 {/* PayPal Settings */}
+                 <div className="glass-panel p-8 rounded-[2.5rem] border-white/10 bg-gradient-to-br from-blue-600/10 via-transparent to-transparent space-y-6">
+                    <div className="flex items-center gap-4 mb-2">
+                       <div className="w-12 h-12 rounded-2xl bg-blue-600/20 flex items-center justify-center text-blue-400 text-2xl">
+                          <i className="fa-brands fa-paypal"></i>
+                       </div>
+                       <div>
+                          <h3 className="text-sm font-black text-white uppercase tracking-widest">PayPal Merchant</h3>
+                          <p className="text-[8px] text-zinc-600 font-bold uppercase tracking-widest">Configure direct receiver email</p>
+                       </div>
+                    </div>
+
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Platform Receiver Email</label>
+                       <input 
+                        type="email"
+                        value={merchantConfig.paypalEmail}
+                        onChange={(e) => setMerchantConfig({ ...merchantConfig, paypalEmail: e.target.value })}
+                        className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 px-6 text-sm text-white focus:outline-none focus:border-blue-500 transition-all"
+                       />
+                    </div>
+
+                    <div className="p-4 bg-white/5 rounded-2xl border border-white/5 flex items-center justify-between">
+                       <div className="flex items-center gap-3">
+                          <i className="fa-solid fa-circle-check text-green-500 text-[10px]"></i>
+                          <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">API Status</span>
+                       </div>
+                       <span className="text-[10px] font-black text-green-500 uppercase tracking-widest">Connected</span>
+                    </div>
+                 </div>
+
+                 {/* Visa/Mastercard Settings */}
+                 <div className="glass-panel p-8 rounded-[2.5rem] border-white/10 bg-gradient-to-br from-indigo-600/10 via-transparent to-transparent space-y-6">
+                    <div className="flex items-center gap-4 mb-2">
+                       <div className="w-12 h-12 rounded-2xl bg-indigo-600/20 flex items-center justify-center text-indigo-400 text-2xl">
+                          <i className="fa-solid fa-credit-card"></i>
+                       </div>
+                       <div>
+                          <h3 className="text-sm font-black text-white uppercase tracking-widest">Visa / Card Processing</h3>
+                          <p className="text-[8px] text-zinc-600 font-bold uppercase tracking-widest">Secure Bank Gateway ID</p>
+                       </div>
+                    </div>
+
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Merchant ID (HIDDEN)</label>
+                       <input 
+                        type="password"
+                        value={merchantConfig.visaMerchantId}
+                        onChange={(e) => setMerchantConfig({ ...merchantConfig, visaMerchantId: e.target.value })}
+                        className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 px-6 text-sm text-white focus:outline-none focus:border-indigo-500 transition-all"
+                       />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                       <div className="space-y-1">
+                          <label className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Gateway</label>
+                          <select 
+                             value={merchantConfig.gatewayProvider}
+                             onChange={(e) => setMerchantConfig({...merchantConfig, gatewayProvider: e.target.value})}
+                             className="w-full bg-zinc-900 border border-white/5 rounded-xl py-3 px-4 text-[10px] text-zinc-400"
+                          >
+                             <option>Stripe Connect</option>
+                             <option>Square Business</option>
+                             <option>Direct Bank XML</option>
+                          </select>
+                       </div>
+                       <div className="space-y-1">
+                          <label className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Region</label>
+                          <div className="w-full bg-zinc-900/50 border border-white/5 rounded-xl py-3 px-4 text-[10px] text-zinc-600 uppercase">Global</div>
+                       </div>
+                    </div>
+                 </div>
+              </div>
+
+              {/* Settlement Logic */}
+              <div className="glass-panel p-10 rounded-[3rem] border-white/10 flex flex-col md:flex-row items-center justify-between gap-12">
+                 <div className="flex-1 space-y-4 text-center md:text-left">
+                    <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Settlement Controls</h3>
+                    <p className="text-[10px] text-zinc-500 uppercase tracking-widest leading-relaxed font-bold">
+                       Current Diamond Sales Volume is held in Platform Escrow. Trigger manual settlements or toggle environment mode.
+                    </p>
+                    <div className="flex flex-wrap items-center gap-6 mt-4 justify-center md:justify-start">
+                       <div className="flex items-center gap-3">
+                          <span className="text-[10px] font-black text-zinc-600 uppercase">Environment</span>
+                          <button 
+                             onClick={() => setMerchantConfig({...merchantConfig, isLiveMode: !merchantConfig.isLiveMode})}
+                             className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase transition-all ${merchantConfig.isLiveMode ? 'bg-red-600 text-white' : 'bg-zinc-800 text-zinc-500'}`}
+                          >
+                             {merchantConfig.isLiveMode ? 'PRODUCTION' : 'SANDBOX'}
+                          </button>
+                       </div>
+                       <div className="flex items-center gap-3">
+                          <span className="text-[10px] font-black text-zinc-600 uppercase">Auto-Settle</span>
+                          <button 
+                             onClick={() => setMerchantConfig({...merchantConfig, autoSettlement: !merchantConfig.autoSettlement})}
+                             className={`w-10 h-5 rounded-full p-1 transition-all ${merchantConfig.autoSettlement ? 'bg-cyan-600' : 'bg-zinc-800'}`}
+                          >
+                             <div className={`w-3 h-3 rounded-full bg-white transition-all ${merchantConfig.autoSettlement ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                          </button>
+                       </div>
+                    </div>
+                 </div>
+                 
+                 <div className="shrink-0 flex flex-col gap-3">
+                    <button className="px-12 py-5 bg-white text-black font-black text-[10px] uppercase tracking-[0.2em] rounded-2xl shadow-2xl hover:bg-zinc-200 transition-all active:scale-95">
+                       PUSH $12,450 TO BANK
+                    </button>
+                    <p className="text-center text-[8px] font-black text-zinc-600 uppercase tracking-widest">Pending Clear: $2,100.42</p>
+                 </div>
               </div>
             </div>
           )}
@@ -329,7 +462,7 @@ const AdminDashboard: React.FC = () => {
             </div>
           )}
 
-          {activeTab !== 'overview' && activeTab !== 'ads' && (
+          {activeTab !== 'overview' && activeTab !== 'ads' && activeTab !== 'treasury' && (
             <div className="h-full flex flex-col items-center justify-center opacity-40 text-center space-y-4">
                <div className="w-16 h-16 rounded-full bg-zinc-900 border border-white/5 flex items-center justify-center">
                   <i className="fa-solid fa-screwdriver-wrench text-xl text-zinc-600"></i>
