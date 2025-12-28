@@ -1,15 +1,17 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { PayoutSettings } from '../types';
 
 interface UserProfile {
   name: string;
   email: string;
   bio?: string;
+  avatar?: string;
+  cover?: string;
 }
 
 interface GalleryItem {
-  id: number;
+  id: string;
   url: string;
   likes: string;
   comments: string;
@@ -24,70 +26,126 @@ interface ProfileViewProps {
 }
 
 const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack }) => {
-  const [formData, setFormData] = useState<UserProfile>({ ...user });
+  const [formData, setFormData] = useState<UserProfile>({ 
+    ...user,
+    avatar: user.avatar || `https://ui-avatars.com/api/?name=${user.name}&size=256&background=f472b6&color=fff`,
+    cover: user.cover || "https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=1200&q=80"
+  });
+  
   const [isEditing, setIsEditing] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [activeTab, setActiveTab] = useState<'showcase' | 'wallet' | 'settings'>('showcase');
   const [activeGalleryType, setActiveGalleryType] = useState<'free' | 'paid'>('free');
   
-  const [payoutSettings, setPayoutSettings] = useState<PayoutSettings>({
-    method: 'card',
-    paypalEmail: 'vip.support@mydoll.club',
-    cardNumber: '**** **** **** 8888',
-    cardExpiry: '12/28',
-    cardHolder: user.name
-  });
-
-  const [galleryPhotos] = useState<GalleryItem[]>([
-    { id: 1, url: 'https://images.unsplash.com/photo-1511367461989-f85a21fda167?auto=format&fit=crop&w=600&q=80', likes: '1.2k', comments: '45', type: 'free' },
-    { id: 2, url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=600&q=80', likes: '890', comments: '22', type: 'free' },
-    { id: 3, url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80', likes: '2.4k', comments: '112', type: 'paid', price: 99.00 },
-    { id: 4, url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=80', likes: '560', comments: '12', type: 'paid', price: 49.99 },
-    { id: 5, url: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=600&q=80', likes: '1.1k', comments: '34', type: 'free' },
-    { id: 6, url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80', likes: '920', comments: '28', type: 'paid', price: 150.00 },
+  // Dynamic Gallery State
+  const [galleryPhotos, setGalleryPhotos] = useState<GalleryItem[]>([
+    { id: '1', url: 'https://images.unsplash.com/photo-1511367461989-f85a21fda167?auto=format&fit=crop&w=600&q=80', likes: '1.2k', comments: '45', type: 'free' },
+    { id: '2', url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=600&q=80', likes: '890', comments: '22', type: 'free' },
+    { id: '3', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80', likes: '2.4k', comments: '112', type: 'paid', price: 99.00 },
+    { id: '6', url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80', likes: '920', comments: '28', type: 'paid', price: 150.00 },
   ]);
 
-  const handleSave = () => {
+  // Upload Modal State
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [newUpload, setNewUpload] = useState({
+    url: '',
+    type: 'free' as 'free' | 'paid',
+    price: 0
+  });
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, target: 'avatar' | 'cover' | 'album') => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        if (target === 'avatar') setFormData(prev => ({ ...prev, avatar: result }));
+        if (target === 'cover') setFormData(prev => ({ ...prev, cover: result }));
+        if (target === 'album') setNewUpload(prev => ({ ...prev, url: result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAddToAlbum = () => {
+    if (!newUpload.url) return;
+    const item: GalleryItem = {
+      id: Math.random().toString(36).substr(2, 9),
+      url: newUpload.url,
+      likes: '0',
+      comments: '0',
+      type: newUpload.type,
+      price: newUpload.type === 'paid' ? newUpload.price : undefined
+    };
+    setGalleryPhotos(prev => [item, ...prev]);
+    setShowUploadModal(false);
+    setNewUpload({ url: '', type: 'free', price: 0 });
+    setActiveGalleryType(item.type);
+  };
+
+  const deleteItem = (id: string) => {
+    setGalleryPhotos(prev => prev.filter(p => p.id !== id));
+  };
+
+  const handleSaveProfile = () => {
     onUpdate(formData);
     setIsEditing(false);
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 3000);
   };
 
-  const mockStats = [
-    { label: 'Followers', value: '1.2k', icon: 'fa-users', color: 'text-pink-400' },
-    { label: 'Rating', value: '4.9', icon: 'fa-star', color: 'text-yellow-400' },
-    { label: 'Level', value: '77', icon: 'fa-crown', color: 'text-amber-400' },
-  ];
-
   return (
     <div className="max-w-6xl mx-auto h-full flex flex-col gap-4 overflow-y-auto pb-24 lg:pb-32 hide-scrollbar px-1 relative">
+      
       {/* Hero Section */}
-      <div className="relative h-48 md:h-72 lg:h-80 rounded-[2rem] lg:rounded-[3rem] overflow-hidden shrink-0 shadow-2xl border border-white/5">
+      <div className="relative h-48 md:h-72 lg:h-80 rounded-[2rem] lg:rounded-[3rem] overflow-hidden shrink-0 shadow-2xl border border-white/5 group">
         <img 
-          src="https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=1200&q=80" 
-          className="w-full h-full object-cover" 
+          src={formData.cover} 
+          className="w-full h-full object-cover transition-all duration-700" 
           alt="cover" 
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent"></div>
+        {isEditing && (
+          <div 
+            onClick={() => coverInputRef.current?.click()}
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm flex flex-col items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            <i className="fa-solid fa-camera text-4xl mb-2 text-white"></i>
+            <span className="text-[10px] font-black uppercase tracking-widest text-white">Change Banner</span>
+          </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent pointer-events-none"></div>
         <button 
           onClick={onBack}
-          className="absolute top-6 left-6 w-10 h-10 rounded-2xl bg-black/40 backdrop-blur-md flex items-center justify-center text-white border border-white/10 hover:bg-white/10 transition-all"
+          className="absolute top-6 left-6 w-10 h-10 rounded-2xl bg-black/40 backdrop-blur-md flex items-center justify-center text-white border border-white/10 hover:bg-white/10 transition-all z-20"
         >
           <i className="fa-solid fa-arrow-left text-xs"></i>
         </button>
+        <input type="file" ref={coverInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileChange(e, 'cover')} />
       </div>
 
       {/* Profile Header Info */}
       <div className="px-6 lg:px-12 -mt-16 relative z-10 flex flex-col items-center md:flex-row md:items-end gap-6 lg:gap-8">
-        <div className="relative shrink-0">
-          <div className="w-32 h-32 md:w-36 md:h-36 lg:w-44 lg:h-44 rounded-[2.5rem] lg:rounded-[3rem] overflow-hidden border-4 md:border-8 border-zinc-950 shadow-2xl bg-zinc-900 group">
+        <div className="relative shrink-0 group">
+          <div className="w-32 h-32 md:w-36 md:h-36 lg:w-44 lg:h-44 rounded-[2.5rem] lg:rounded-[3rem] overflow-hidden border-4 md:border-8 border-zinc-950 shadow-2xl bg-zinc-900">
             <img 
-              src={`https://ui-avatars.com/api/?name=${user.name}&size=144&background=f472b6&color=fff`} 
+              src={formData.avatar} 
               className="w-full h-full object-cover transition-transform group-hover:scale-110 duration-500" 
               alt="avatar" 
             />
+            {isEditing && (
+              <div 
+                onClick={() => avatarInputRef.current?.click()}
+                className="absolute inset-0 bg-black/40 backdrop-blur-sm flex flex-col items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <i className="fa-solid fa-camera text-2xl text-white"></i>
+              </div>
+            )}
           </div>
+          <input type="file" ref={avatarInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileChange(e, 'avatar')} />
           <div className="absolute bottom-2 right-2 w-9 h-9 rounded-xl bg-pink-600 border-4 border-zinc-950 flex items-center justify-center text-white shadow-xl">
              <i className="fa-solid fa-check text-xs"></i>
           </div>
@@ -95,23 +153,17 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack }) => 
 
         <div className="flex-1 text-center md:text-left">
           <div className="flex flex-col md:flex-row md:items-center gap-2 mb-2 lg:mb-4">
-            <h1 className="text-3xl lg:text-5xl font-black text-white tracking-tight">{user.name}</h1>
-            <div className="flex items-center justify-center md:justify-start gap-2">
-              <span className="px-2 py-0.5 bg-pink-500/10 border border-pink-500/20 text-[8px] lg:text-[10px] text-pink-400 font-black uppercase tracking-widest rounded-md">VERIFIED CREATOR</span>
-            </div>
+            <h1 className="text-3xl lg:text-5xl font-black text-white tracking-tight">{formData.name}</h1>
+            <button 
+              onClick={() => isEditing ? handleSaveProfile() : setIsEditing(true)}
+              className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${isEditing ? 'bg-green-600 text-white shadow-lg shadow-green-600/20' : 'bg-white/5 text-zinc-400 border border-white/5 hover:bg-white/10'}`}
+            >
+              {isEditing ? 'Save Changes' : 'Edit Profile'}
+            </button>
           </div>
           <p className="text-zinc-500 text-xs lg:text-base max-w-2xl mb-4 lg:mb-6 line-clamp-2 italic leading-relaxed">
-            {user.bio || 'Living the dream in the My Doll elite social club. Always online, always exclusive.'}
+            {formData.bio || 'Living the dream in the My Doll elite social club. Always online, always exclusive.'}
           </p>
-          <div className="flex flex-wrap justify-center md:justify-start gap-3">
-             {mockStats.map((stat, i) => (
-               <div key={i} className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-xl border border-white/5 shadow-sm">
-                 <i className={`fa-solid ${stat.icon} ${stat.color} text-[10px] lg:text-xs`}></i>
-                 <span className="text-xs lg:text-sm font-black text-white">{stat.value}</span>
-                 <span className="text-[8px] lg:text-[9px] text-zinc-600 font-black uppercase tracking-[0.2em]">{stat.label}</span>
-               </div>
-             ))}
-          </div>
         </div>
       </div>
 
@@ -147,8 +199,11 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack }) => 
                     PREMIUM
                   </button>
                </div>
-               <button className="hidden sm:flex items-center gap-2 text-[10px] font-black text-zinc-600 hover:text-white uppercase tracking-widest transition-colors">
-                  <i className="fa-solid fa-plus"></i> Add New
+               <button 
+                onClick={() => setShowUploadModal(true)}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black text-white uppercase tracking-widest hover:bg-white/10 transition-all shadow-xl"
+               >
+                  <i className="fa-solid fa-plus"></i> Upload New
                </button>
             </div>
 
@@ -156,14 +211,25 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack }) => 
               {galleryPhotos.filter(p => p.type === activeGalleryType).map((item) => (
                 <div key={item.id} className="group relative aspect-square rounded-[2rem] lg:rounded-[2.5rem] overflow-hidden border border-white/5 bg-zinc-900 shadow-xl cursor-pointer">
                   <img src={item.url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="gallery" />
+                  
+                  {item.type === 'paid' && (
+                    <div className="absolute top-4 right-4 px-3 py-1 bg-indigo-600/90 backdrop-blur-md rounded-lg shadow-xl border border-white/20 z-10 flex items-center gap-2">
+                       <i className="fa-solid fa-gem text-[10px] text-cyan-300"></i>
+                       <span className="text-[10px] font-black text-white">{item.price}</span>
+                    </div>
+                  )}
+
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-6">
-                     <div className="flex items-center justify-between">
+                     <div className="flex items-center justify-between mb-4">
                        <span className="text-[10px] font-black text-white flex items-center gap-2">
                          <i className="fa-solid fa-heart text-pink-500"></i> {item.likes}
                        </span>
-                       <span className="text-[10px] font-black text-white flex items-center gap-2">
-                         <i className="fa-solid fa-comment text-indigo-400"></i> {item.comments}
-                       </span>
+                       <button 
+                        onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }}
+                        className="w-8 h-8 rounded-lg bg-red-600/20 text-red-500 hover:bg-red-600 hover:text-white transition-all"
+                       >
+                         <i className="fa-solid fa-trash-can text-[10px]"></i>
+                       </button>
                      </div>
                   </div>
                 </div>
@@ -183,22 +249,6 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack }) => 
                 </button>
               </div>
               <i className="fa-solid fa-vault absolute -bottom-10 -right-10 text-[12rem] text-white/[0.02]"></i>
-            </div>
-            
-            <div className="glass-panel p-6 lg:p-8 rounded-[2.5rem] border-white/5 space-y-4 shadow-xl">
-               <h3 className="text-[10px] font-black text-zinc-600 uppercase tracking-widest mb-2 px-2">Primary Disbursement Method</h3>
-               <div className="p-5 bg-zinc-900 rounded-2xl border border-white/5 flex items-center justify-between group cursor-pointer hover:border-pink-500/30 transition-all">
-                  <div className="flex items-center gap-5">
-                    <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-pink-500">
-                       <i className="fa-solid fa-credit-card text-xl"></i>
-                    </div>
-                    <div>
-                       <span className="text-sm font-black text-white block mb-1">{payoutSettings.cardNumber}</span>
-                       <span className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest">VISA GOLD • EXP {payoutSettings.cardExpiry}</span>
-                    </div>
-                  </div>
-                  <i className="fa-solid fa-chevron-right text-xs text-zinc-700 group-hover:text-pink-500 transition-colors"></i>
-               </div>
             </div>
           </div>
         )}
@@ -231,17 +281,90 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack }) => 
                   className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 px-6 text-sm text-white focus:outline-none focus:border-pink-500/50 resize-none transition-all shadow-inner"
                 />
              </div>
-             <div className="pt-4">
-                <button 
-                  onClick={handleSave}
-                  className="w-full md:w-auto px-12 py-4 bg-pink-600 hover:bg-pink-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-2xl shadow-pink-600/30 transition-all active:scale-95"
-                >
-                  UPGRADE SETTINGS
-                </button>
-             </div>
           </div>
         )}
       </div>
+
+      {/* Upload Modal */}
+      {showUploadModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-zinc-950/90 backdrop-blur-xl animate-in fade-in duration-300">
+           <div className="w-full max-w-lg glass-panel p-8 rounded-[3rem] border-white/10 shadow-2xl space-y-6 relative overflow-hidden">
+              <div className="absolute top-6 right-6">
+                <button onClick={() => setShowUploadModal(false)} className="text-zinc-600 hover:text-white transition-colors">
+                   <i className="fa-solid fa-xmark text-lg"></i>
+                </button>
+              </div>
+
+              <div>
+                 <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Add to Album</h3>
+                 <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Share exclusive visual art with your elite circle</p>
+              </div>
+
+              {!newUpload.url ? (
+                <div 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="aspect-video rounded-[2rem] border-2 border-dashed border-zinc-800 flex flex-col items-center justify-center gap-4 cursor-pointer hover:border-pink-500/50 hover:bg-white/5 transition-all"
+                >
+                   <div className="w-16 h-16 rounded-full bg-zinc-900 border border-white/5 flex items-center justify-center text-zinc-600">
+                      <i className="fa-solid fa-cloud-arrow-up text-2xl"></i>
+                   </div>
+                   <span className="text-xs font-bold text-zinc-500">Select Image to Upload</span>
+                   <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileChange(e, 'album')} />
+                </div>
+              ) : (
+                <div className="space-y-6 animate-in slide-in-from-bottom-4">
+                  <div className="aspect-video rounded-[2rem] overflow-hidden border border-white/10 relative group">
+                    <img src={newUpload.url} className="w-full h-full object-cover" alt="preview" />
+                    <button 
+                      onClick={() => setNewUpload(prev => ({ ...prev, url: '' }))}
+                      className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/60 backdrop-blur-md text-white flex items-center justify-center hover:bg-red-600 transition-colors"
+                    >
+                      <i className="fa-solid fa-trash-can text-xs"></i>
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <button 
+                      onClick={() => setNewUpload(prev => ({ ...prev, type: 'free' }))}
+                      className={`py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${newUpload.type === 'free' ? 'bg-pink-600 border-pink-500 text-white shadow-lg shadow-pink-600/20' : 'bg-zinc-900 border-white/5 text-zinc-500'}`}
+                    >
+                      Public Album
+                    </button>
+                    <button 
+                      onClick={() => setNewUpload(prev => ({ ...prev, type: 'paid' }))}
+                      className={`py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${newUpload.type === 'paid' ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/20' : 'bg-zinc-900 border-white/5 text-zinc-500'}`}
+                    >
+                      Premium Album
+                    </button>
+                  </div>
+
+                  {newUpload.type === 'paid' && (
+                    <div className="space-y-2 animate-in fade-in duration-300">
+                       <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Unlock Price (Diamonds)</label>
+                       <div className="relative">
+                          <i className="fa-solid fa-gem absolute left-4 top-1/2 -translate-y-1/2 text-cyan-500 text-xs"></i>
+                          <input 
+                            type="number" 
+                            placeholder="Set price..."
+                            value={newUpload.price}
+                            onChange={(e) => setNewUpload(prev => ({ ...prev, price: parseInt(e.target.value) || 0 }))}
+                            className="w-full bg-black/40 border border-white/10 rounded-2xl py-4 pl-12 pr-6 text-sm text-white focus:outline-none focus:border-indigo-500/50 transition-all"
+                          />
+                       </div>
+                    </div>
+                  )}
+
+                  <button 
+                    onClick={handleAddToAlbum}
+                    className="w-full py-5 bg-white text-black font-black text-xs uppercase tracking-widest rounded-[1.5rem] shadow-2xl transition-all active:scale-95"
+                  >
+                    FINALIZE UPLOAD
+                  </button>
+                </div>
+              )}
+           </div>
+        </div>
+      )}
 
       {isSaved && (
         <div className="fixed bottom-24 lg:bottom-12 left-1/2 -translate-x-1/2 px-8 py-3 bg-green-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-2xl animate-in slide-in-from-bottom-8 duration-500 z-[100]">
