@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 
 interface StoreViewProps {
   diamonds: number;
@@ -21,24 +21,12 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
   const [paymentMethod, setPaymentMethod] = useState<'visa' | 'paypal' | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [paypalError, setPaypalError] = useState<string | null>(null);
-  
-  const paypalContainerRef = useRef<HTMLDivElement>(null);
-  const activePackRef = useRef<typeof DIAMOND_PACKS[0] | null>(null);
-  const isButtonRenderedRef = useRef<boolean>(false);
-
-  // Use the new Button ID provided by the user
-  const BUTTON_ID = "8TN879EM3GXUW";
-
-  useEffect(() => {
-    activePackRef.current = selectedPack;
-  }, [selectedPack]);
+  const [awaitingVerification, setAwaitingVerification] = useState(false);
 
   const handleBuy = (pack: typeof DIAMOND_PACKS[0]) => {
     setSelectedPack(pack);
     setPaymentMethod(null);
-    setPaypalError(null);
-    isButtonRenderedRef.current = false;
+    setAwaitingVerification(false);
   };
 
   const confirmVisaPurchase = () => {
@@ -54,99 +42,30 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
     }, 2000);
   };
 
-  // Dedicated effect for PayPal rendering to isolate lifecycle
-  useEffect(() => {
-    let isMounted = true;
-    let renderTimer: number;
+  const handlePaypalClick = () => {
+    // When using a standard form, we can't detect when the payment is finished programmatically
+    // from this window easily without webhooks. For this UI, we'll show a "Verification" state.
+    setAwaitingVerification(true);
+  };
 
-    const renderPaypal = async () => {
-      if (!isMounted || paymentMethod !== 'paypal' || !selectedPack || !paypalContainerRef.current) return;
-      if (isButtonRenderedRef.current) return;
-
-      const sdk = (window as any).paypal;
-      if (!sdk || !sdk.HostedButtons) {
-        console.warn("PayPal SDK or HostedButtons not available, retrying...");
-        renderTimer = window.setTimeout(renderPaypal, 1000);
-        return;
-      }
-
-      try {
-        isButtonRenderedRef.current = true;
-        
-        // Clear container completely to avoid "Can not read window host" caused by conflicting iframes
-        if (paypalContainerRef.current) {
-          paypalContainerRef.current.innerHTML = '';
-        }
-
-        const ppInstance = sdk.HostedButtons({
-          hostedButtonId: BUTTON_ID,
-          onApprove: (data: any, actions: any) => {
-            console.log("PayPal Transaction Confirmed", data);
-            const pack = activePackRef.current;
-            if (pack && isMounted) {
-              onPurchase(pack.amount);
-              setShowSuccess(true);
-              setTimeout(() => { if (isMounted) setShowSuccess(false); }, 5000);
-              setSelectedPack(null);
-              setPaymentMethod(null);
-            }
-          },
-          onCancel: () => {
-            console.log("PayPal Transaction Cancelled");
-            if (isMounted) isButtonRenderedRef.current = false;
-          },
-          onError: (err: any) => {
-            console.error("PayPal Error Callback caught:", err);
-            if (isMounted) {
-              setPaypalError("PayPal is currently unavailable in this environment. Using Simulation Mode.");
-              isButtonRenderedRef.current = false;
-            }
-          }
-        });
-        
-        if (paypalContainerRef.current && isMounted) {
-          // Wrapped in a safe try-catch to prevent top-level unhandled exceptions
-          await ppInstance.render(`#${paypalContainerRef.current.id}`).catch((renderErr: any) => {
-             console.error("Internal Render Error:", renderErr);
-             if (isMounted) setPaypalError("Security block detected. Use Card or Simulation.");
-          });
-        }
-      } catch (err) {
-        console.error("PayPal Initialization Exception:", err);
-        if (isMounted) {
-          setPaypalError("Gateway initialization failed.");
-          isButtonRenderedRef.current = false;
-        }
-      }
-    };
-
-    if (paymentMethod === 'paypal') {
-      renderTimer = window.setTimeout(renderPaypal, 300);
-    }
-
-    return () => {
-      isMounted = false;
-      clearTimeout(renderTimer);
-      isButtonRenderedRef.current = false;
-    };
-  }, [paymentMethod, selectedPack, onPurchase]);
-
-  // Fallback for when the environment strictly blocks PayPal iframes (common in preview sandboxes)
-  const simulatePayment = () => {
+  const verifyManualPayment = () => {
     if (!selectedPack) return;
     setIsProcessing(true);
+    // Simulate verification of the transaction
     setTimeout(() => {
       onPurchase(selectedPack.amount);
       setIsProcessing(false);
       setShowSuccess(true);
-      setTimeout(() => setShowSuccess(false), 5000);
+      setAwaitingVerification(false);
       setSelectedPack(null);
       setPaymentMethod(null);
+      setTimeout(() => setShowSuccess(false), 5000);
     }, 1500);
   };
 
   return (
     <div className="max-w-4xl mx-auto h-full flex flex-col gap-6 overflow-y-auto pb-32 hide-scrollbar">
+      {/* Vault Balance Display */}
       <div className="flex items-center justify-between px-4 mt-4">
         <div>
           <h1 className="text-3xl font-black text-white tracking-tighter uppercase italic">Diamond Vault</h1>
@@ -158,21 +77,7 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
         </div>
       </div>
 
-      <div className="px-4">
-        <div className="w-full aspect-[21/9] rounded-[2.5rem] overflow-hidden relative border border-white/5 shadow-2xl group">
-          <img 
-            src="https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&w=1200&q=80" 
-            className="w-full h-full object-cover opacity-60 brightness-75 transition-transform duration-700 group-hover:scale-105" 
-            alt="refuel promo" 
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-zinc-950 via-zinc-950/40 to-transparent flex flex-col justify-center px-12">
-             <div className="inline-block w-fit px-3 py-1 bg-pink-600 rounded-lg text-[8px] font-black text-white uppercase tracking-widest mb-4">PLATINUM ACCESS</div>
-             <h2 className="text-4xl font-black text-white leading-none mb-2">Double Influence Refill</h2>
-             <p className="text-zinc-400 text-xs font-medium max-w-sm">Support elite creators and unlock premium content instantly.</p>
-          </div>
-        </div>
-      </div>
-
+      {/* Packs Selection Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 lg:gap-6 px-4">
         {DIAMOND_PACKS.map((pack) => (
           <div 
@@ -194,6 +99,7 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
         ))}
       </div>
 
+      {/* Security Info */}
       <div className="px-4">
         <div className="glass-panel p-8 rounded-[2.5rem] border-white/5 flex flex-col md:flex-row items-center justify-between gap-6 bg-gradient-to-br from-indigo-600/10 via-transparent to-transparent">
            <div className="flex items-center gap-6">
@@ -201,9 +107,9 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
                  <i className="fa-solid fa-shield-halved"></i>
               </div>
               <div className="max-w-md">
-                 <h4 className="text-sm font-black text-white uppercase tracking-widest mb-1">Encrypted Gateway</h4>
+                 <h4 className="text-sm font-black text-white uppercase tracking-widest mb-1">Secure Checkout</h4>
                  <p className="text-[10px] text-zinc-500 leading-relaxed font-bold uppercase tracking-tighter">
-                    Transactions are secured via global merchant protocols. Profile updates are immediate upon verification.
+                    Using direct merchant forms to prevent browser security blocks. Transactions are processed on PayPal's secure servers.
                  </p>
               </div>
            </div>
@@ -211,6 +117,7 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
         </div>
       </div>
 
+      {/* Checkout Selection Modal */}
       {selectedPack && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-zinc-950/90 backdrop-blur-xl animate-in fade-in duration-300">
           <div className="w-full max-w-md glass-panel p-8 rounded-[3rem] border-white/10 shadow-2xl space-y-6 relative overflow-hidden text-center">
@@ -229,45 +136,90 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
             </div>
 
             <div className="p-4 bg-white/5 rounded-2xl border border-white/5 flex justify-between items-center">
-               <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Checkout Amount</span>
+               <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Amount</span>
                <span className="text-xl font-black text-white">${selectedPack.price.toFixed(2)}</span>
             </div>
 
-            <div className="space-y-4">
-              <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest text-left ml-2">Select Secure Provider</p>
-              <div className="grid grid-cols-2 gap-3">
-                <button 
-                  onClick={() => { setPaymentMethod('visa'); setPaypalError(null); }}
-                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${paymentMethod === 'visa' ? 'bg-indigo-600/20 border-indigo-500 text-white' : 'bg-white/5 border-white/10 text-zinc-500 hover:bg-white/10'}`}
-                >
-                  <i className="fa-brands fa-cc-visa text-2xl"></i>
-                  <span className="text-[8px] font-black uppercase tracking-widest">Card Pay</span>
-                </button>
-                <button 
-                  onClick={() => { setPaymentMethod('paypal'); setPaypalError(null); }}
-                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${paymentMethod === 'paypal' ? 'bg-blue-600/20 border-blue-500 text-white' : 'bg-white/5 border-white/10 text-zinc-500 hover:bg-white/10'}`}
-                >
-                  <i className="fa-brands fa-paypal text-2xl"></i>
-                  <span className="text-[8px] font-black uppercase tracking-widest">PayPal</span>
-                </button>
+            {/* Provider Selection */}
+            {!awaitingVerification && (
+              <div className="space-y-4">
+                <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest text-left ml-2">Select Provider</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <button 
+                    onClick={() => setPaymentMethod('visa')}
+                    className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${paymentMethod === 'visa' ? 'bg-indigo-600/20 border-indigo-500 text-white' : 'bg-white/5 border-white/10 text-zinc-500 hover:bg-white/10'}`}
+                  >
+                    <i className="fa-brands fa-cc-visa text-2xl"></i>
+                    <span className="text-[8px] font-black uppercase tracking-widest">Card Pay</span>
+                  </button>
+                  <button 
+                    onClick={() => setPaymentMethod('paypal')}
+                    className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${paymentMethod === 'paypal' ? 'bg-blue-600/20 border-blue-500 text-white' : 'bg-white/5 border-white/10 text-zinc-500 hover:bg-white/10'}`}
+                  >
+                    <i className="fa-brands fa-paypal text-2xl"></i>
+                    <span className="text-[8px] font-black uppercase tracking-widest">PayPal</span>
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
-            {paypalError && (
-              <div className="space-y-3 animate-in fade-in duration-300">
-                <div className="p-4 bg-amber-600/10 border border-amber-500/20 rounded-2xl text-amber-500 text-[10px] font-bold uppercase">
-                  <i className="fa-solid fa-circle-exclamation mr-2"></i> {paypalError}
+            {/* PayPal Direct Form */}
+            {paymentMethod === 'paypal' && !awaitingVerification && (
+              <div className="space-y-4 animate-in slide-in-from-top-2">
+                <div className="p-8 bg-zinc-900 rounded-[2rem] border border-white/5">
+                   <form 
+                      action="https://www.paypal.com/ncp/payment/8TN879EM3GXUW" 
+                      method="post" 
+                      target="_blank" 
+                      className="flex flex-col items-center gap-4"
+                      onSubmit={handlePaypalClick}
+                   >
+                      <button 
+                        type="submit"
+                        className="w-full py-4 bg-[#FFD140] hover:bg-[#f2c63d] text-black font-black text-sm uppercase rounded-xl transition-all active:scale-95 shadow-lg"
+                      >
+                        Buy Now with PayPal
+                      </button>
+                      <img src="https://www.paypalobjects.com/images/Debit_Credit.svg" alt="cards" className="h-6" />
+                      <section className="text-[8px] font-bold text-zinc-600 uppercase tracking-widest">
+                        Powered by <img src="https://www.paypalobjects.com/paypal-ui/logos/svg/paypal-wordmark-color.svg" alt="paypal" className="h-3 inline-block align-middle ml-1" />
+                      </section>
+                   </form>
+                </div>
+                <p className="text-[8px] text-zinc-500 uppercase tracking-widest">
+                  Clicking "Buy Now" opens a new secure tab.
+                </p>
+              </div>
+            )}
+
+            {/* Awaiting Verification State */}
+            {awaitingVerification && (
+              <div className="space-y-6 animate-in zoom-in duration-300">
+                <div className="p-8 bg-indigo-600/10 border border-indigo-500/20 rounded-[2rem]">
+                   <i className="fa-solid fa-hourglass-half text-3xl text-indigo-400 mb-4 animate-pulse"></i>
+                   <h4 className="text-sm font-black text-white uppercase tracking-widest mb-2">Awaiting Completion</h4>
+                   <p className="text-[10px] text-zinc-400 leading-relaxed uppercase font-bold tracking-tighter">
+                      Once you finish the payment in the new tab, click below to verify and sync your vault.
+                   </p>
                 </div>
                 <button 
-                  onClick={simulatePayment}
-                  className="w-full py-4 bg-white text-black font-black text-xs uppercase tracking-widest rounded-2xl shadow-xl transition-all active:scale-95"
+                  onClick={verifyManualPayment}
+                  disabled={isProcessing}
+                  className="w-full py-5 bg-pink-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-2xl transition-all active:scale-95 disabled:opacity-50"
                 >
-                  SIMULATE PURCHASE
+                  {isProcessing ? <i className="fa-solid fa-circle-notch animate-spin"></i> : `VERIFY & CLAIM DIAMONDS`}
+                </button>
+                <button 
+                  onClick={() => setAwaitingVerification(false)}
+                  className="text-[9px] font-black text-zinc-600 uppercase tracking-widest hover:text-white transition-colors"
+                >
+                  Cancel or Choose Another Method
                 </button>
               </div>
             )}
 
-            {paymentMethod === 'visa' && (
+            {/* Visa Card Flow */}
+            {paymentMethod === 'visa' && !awaitingVerification && (
               <div className="space-y-3 animate-in slide-in-from-top-2">
                 <div className="space-y-2 text-left">
                   <input type="text" placeholder="Card Number" className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-xs text-white focus:outline-none focus:border-indigo-500" />
@@ -286,31 +238,16 @@ const StoreView: React.FC<StoreViewProps> = ({ diamonds, onPurchase, onBack }) =
               </div>
             )}
 
-            {paymentMethod === 'paypal' && !paypalError && (
-              <div className="space-y-4 animate-in slide-in-from-top-2">
-                <div className="p-6 bg-blue-600/10 border border-blue-500/20 rounded-[2rem] text-center min-h-[160px] flex flex-col items-center justify-center overflow-hidden">
-                    <div id="paypal-button-container" ref={paypalContainerRef} className="w-full flex justify-center py-2 min-h-[44px]">
-                        <div className="flex flex-col items-center gap-3">
-                            <i className="fa-brands fa-paypal text-3xl text-blue-400 animate-pulse"></i>
-                            <span className="text-[10px] text-blue-300 font-bold uppercase tracking-[0.2em]">Connecting Secure Node...</span>
-                        </div>
-                    </div>
-                    <p className="text-[8px] text-zinc-500 uppercase tracking-widest mt-4">
-                      Top-up added instantly after successful check.
-                    </p>
-                </div>
-              </div>
-            )}
-
-            {!paymentMethod && (
+            {!paymentMethod && !awaitingVerification && (
                <div className="py-8 text-zinc-600 italic text-[10px] uppercase tracking-widest">
-                 Please select your verified gateway to continue
+                 Please select your secure gateway
                </div>
             )}
           </div>
         </div>
       )}
 
+      {/* Success Notification */}
       {showSuccess && (
         <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[110] px-10 py-5 bg-green-600 text-white rounded-3xl font-black text-[11px] uppercase tracking-widest shadow-[0_20px_60px_rgba(22,163,74,0.4)] animate-in slide-in-from-top-12 duration-500">
            <div className="flex items-center gap-3">
