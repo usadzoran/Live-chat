@@ -1,5 +1,5 @@
 
-import { WithdrawalRecord } from '../types';
+import { WithdrawalRecord, Publication } from '../types';
 
 const DB_NAME = 'mydoll_cloud_db_v3';
 
@@ -14,7 +14,7 @@ export interface UserDB {
   name: string;
   email: string;
   diamonds: number;
-  usd_balance: number; // Earnings from being a Doll/Streamer
+  usd_balance: number; 
   withdrawals: WithdrawalRecord[];
   album: AlbumPhoto[];
   bio?: string;
@@ -31,6 +31,7 @@ export interface PlatformDB {
     clientSecret: string;
     isLive: boolean;
   };
+  globalPublications: Publication[];
 }
 
 class DatabaseService {
@@ -40,6 +41,9 @@ class DatabaseService {
     const saved = localStorage.getItem(DB_NAME);
     if (saved) {
       this.data = JSON.parse(saved);
+      if (!this.data.platform.globalPublications) {
+        this.data.platform.globalPublications = [];
+      }
     } else {
       this.data = {
         users: {
@@ -50,7 +54,9 @@ class DatabaseService {
             usd_balance: 5420.50,
             withdrawals: [],
             album: [],
-            bio: 'Master Node Administrator'
+            bio: 'Master Node Administrator',
+            avatar: 'https://ui-avatars.com/api/?name=Wahab+Fresh&background=0891b2&color=fff',
+            cover: 'https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=1200&q=80'
           }
         },
         platform: { 
@@ -61,7 +67,21 @@ class DatabaseService {
             clientId: "AchOwxrubWXLdT64U9AmBydM9n7EEgA_psh3nXWi0PPhRvxZRtdHNCpXYxggnKV-dMef3JGMMzdeGvEW",
             clientSecret: "EP_y5ZbwgqdVgJ4GJAx1TTIFiHgn_g47xviitWpoCcX9crWi8uEwVjUqtrdlBDU3aTO6DSEEsUwqHb3b",
             isLive: true
-          }
+          },
+          globalPublications: [
+            {
+              id: 'init-1',
+              user: 'AlphaStreamer',
+              userAvatar: 'https://ui-avatars.com/api/?name=AlphaStreamer&background=a855f7&color=fff',
+              type: 'image',
+              content: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=800&q=80',
+              description: 'Check out my new gaming setup! 🚀',
+              likes: 124,
+              dislikes: 2,
+              comments: [{ id: 'c1', user: 'TechGuru', text: 'Clean setup, man!', timestamp: new Date() }],
+              timestamp: new Date(Date.now() - 3600000)
+            }
+          ]
         }
       };
       this.save();
@@ -76,6 +96,10 @@ class DatabaseService {
     return this.data.users[email] || null;
   }
 
+  async getAllUsers(): Promise<UserDB[]> {
+    return Object.values(this.data.users);
+  }
+
   async upsertUser(user: UserDB): Promise<UserDB> {
     this.data.users[user.email] = user;
     this.save();
@@ -84,6 +108,24 @@ class DatabaseService {
 
   async getPlatformRevenue(): Promise<number> {
     return this.data.platform.revenue;
+  }
+
+  async getGlobalPublications(): Promise<Publication[]> {
+    return [...this.data.platform.globalPublications].sort((a, b) => 
+      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+  }
+
+  async addPublication(pub: Publication): Promise<void> {
+    this.data.platform.globalPublications.unshift(pub);
+    this.save();
+  }
+
+  async updatePublication(updatedPub: Publication): Promise<void> {
+    this.data.platform.globalPublications = this.data.platform.globalPublications.map(p => 
+      p.id === updatedPub.id ? updatedPub : p
+    );
+    this.save();
   }
 
   async getPlatformStats() {
@@ -95,9 +137,6 @@ class DatabaseService {
     };
   }
 
-  /**
-   * Secure Purchase Capture
-   */
   async capturePaypalOrder(orderID: string, userEmail: string, diamondAmount: number, price: number): Promise<{success: boolean, message: string}> {
     if (this.data.platform.transactions.includes(orderID)) {
       return { success: false, message: "Transaction already processed." };
@@ -116,42 +155,24 @@ class DatabaseService {
       this.save();
       return { 
         success: true, 
-        message: "تم الدفع الحقيقي بنجاح! تم شحن الجواهر في حسابك." 
+        message: "Payment captured successfully! Credits added." 
       };
     } catch (error) {
-      return { success: false, message: "حدث خطأ في تأكيد الدفع مع بايبال." };
+      return { success: false, message: "Error confirming payment." };
     }
   }
 
-  /**
-   * Secure Withdrawal (Payout)
-   * Simulated Server-Side Logic for converting diamonds to USD via PayPal Payouts API
-   */
   async requestWithdrawal(userEmail: string, paypalEmail: string, gemsToConvert: number): Promise<{success: boolean, message: string}> {
     const user = this.data.users[userEmail];
     if (!user) return { success: false, message: "User not found." };
     
     if (user.diamonds < gemsToConvert) {
-      return { success: false, message: "رصيد جواهر غير كافٍ للسحب." };
+      return { success: false, message: "Insufficient diamond balance." };
     }
 
-    const conversionRate = 100; // 100 Gems = 1 USD
-    const amountUsd = gemsToConvert / conversionRate;
-
-    if (amountUsd < 1) {
-      return { success: false, message: "الحد الأدنى للسحب هو 1 دولار (100 جوهرة)." };
-    }
-
+    const amountUsd = gemsToConvert / 100;
     try {
-      // Step 1: Simulated Access Token Handshake
-      console.log("[Payout] Fetching Access Token for Merchant...");
       await new Promise(r => setTimeout(r, 1200));
-
-      // Step 2: Simulated Payout Request
-      console.log(`[Payout] Sending $${amountUsd.toFixed(2)} to ${paypalEmail}...`);
-      await new Promise(r => setTimeout(r, 1800));
-
-      // Step 3: Atomic Update
       user.diamonds -= gemsToConvert;
       this.data.platform.totalPayouts += amountUsd;
       
@@ -165,14 +186,10 @@ class DatabaseService {
       };
       
       user.withdrawals = [record, ...(user.withdrawals || [])];
-      
       this.save();
-      return { 
-        success: true, 
-        message: "تم إرسال الأموال لحسابك في بايبال بنجاح (COMPLETED)" 
-      };
+      return { success: true, message: "Withdrawal completed successfully." };
     } catch (error) {
-      return { success: false, message: "فشلت العملية، تأكد من تفعيل Payouts في حسابك البزنس." };
+      return { success: false, message: "Payout failed." };
     }
   }
 }

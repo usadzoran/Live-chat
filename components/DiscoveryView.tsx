@@ -1,90 +1,78 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { db, UserDB } from '../services/databaseService';
 
 interface DiscoveryProfile {
   id: string;
   name: string;
   age: number;
-  gender: 'man' | 'woman';
+  gender: 'man' | 'woman' | 'other';
   bio: string;
   photo: string;
   distance: string;
+  isPremium: boolean;
 }
 
-const DISCOVERY_PROFILES: DiscoveryProfile[] = [
-  {
-    id: 'd1',
-    name: 'Sofia Martinez',
-    age: 24,
-    gender: 'woman',
-    bio: 'Digital artist & coffee addict. Seeking an elite mentor for my creative projects. ✨',
-    photo: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=800&q=80',
-    distance: '3 miles away'
-  },
-  {
-    id: 'd2',
-    name: 'Marcus Chen',
-    age: 27,
-    gender: 'man',
-    bio: 'Full-stack dev by day, luxury traveler by night. Ready to support your dreams. 🏔️',
-    photo: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=800&q=80',
-    distance: '8 miles away'
-  },
-  {
-    id: 'd3',
-    name: 'Elena Volkov',
-    age: 22,
-    gender: 'woman',
-    bio: 'Professional dancer. I value high-end connections and digital quality. 🩰',
-    photo: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=800&q=80',
-    distance: '1 mile away'
-  },
-  {
-    id: 'd4',
-    name: 'Jordan Smith',
-    age: 35,
-    gender: 'man',
-    bio: 'Elite streamer looking for a sophisticated connection. 🎮',
-    photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80',
-    distance: '5 miles away'
-  },
-  {
-    id: 'd5',
-    name: 'Isabella Rossi',
-    age: 42,
-    gender: 'woman',
-    bio: 'Fashion consultant. Looking for meaningful conversations and elite networking.',
-    photo: 'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?auto=format&fit=crop&w=800&q=80',
-    distance: '12 miles away'
-  },
-  {
-    id: 'd6',
-    name: 'David Wright',
-    age: 55,
-    gender: 'man',
-    bio: 'Entrepreneur and mentor. I enjoy the finer things in life and sharing wisdom.',
-    photo: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=800&q=80',
-    distance: '15 miles away'
-  }
-];
-
 const DiscoveryView: React.FC = () => {
+  const [profiles, setProfiles] = useState<DiscoveryProfile[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState<'left' | 'right' | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Filter States
   const [genderFilter, setGenderFilter] = useState<'all' | 'man' | 'woman'>('all');
   const [minAge, setMinAge] = useState(18);
   const [maxAge, setMaxAge] = useState(60);
 
+  const fetchUsers = async () => {
+    try {
+      const allUsers = await db.getAllUsers();
+      const activeUser = localStorage.getItem('mydoll_active_user');
+      
+      // Filter out self and map to discovery cards
+      const discoveryList: DiscoveryProfile[] = allUsers
+        .filter(u => u.email !== activeUser)
+        .map(u => ({
+          id: u.email,
+          name: u.name,
+          age: Math.floor(Math.random() * 20) + 18, // Simulated age as it's not in DB yet
+          gender: 'woman', // Default for now
+          bio: u.bio || 'Seeking elite connections.',
+          photo: u.avatar || `https://ui-avatars.com/api/?name=${u.name}&background=f472b6&color=fff&size=512`,
+          distance: `${(Math.random() * 10).toFixed(1)} miles away`,
+          isPremium: (u.album?.some(p => p.price > 0)) || false
+        }));
+
+      // Add some high-quality mock fallbacks if DB is thin
+      if (discoveryList.length < 3) {
+        discoveryList.push(
+          { id: 'm1', name: 'Sofia', age: 24, gender: 'woman', bio: 'Art enthusiast and world traveler.', photo: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=800&q=80', distance: '1.2m', isPremium: true },
+          { id: 'm2', name: 'Elena', age: 22, gender: 'woman', bio: 'Looking for a mentor to help with my startup.', photo: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=800&q=80', distance: '0.8m', isPremium: false }
+        );
+      }
+
+      setProfiles(discoveryList);
+    } catch (e) {
+      console.error("Discovery fetch failed", e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+    const interval = setInterval(fetchUsers, 20000); // Auto refresh new members every 20s
+    return () => clearInterval(interval);
+  }, []);
+
   const filteredProfiles = useMemo(() => {
-    return DISCOVERY_PROFILES.filter(p => {
+    return profiles.filter(p => {
       const matchesGender = genderFilter === 'all' || p.gender === genderFilter;
       const matchesAge = p.age >= minAge && p.age <= maxAge;
       return matchesGender && matchesAge;
     });
-  }, [genderFilter, minAge, maxAge]);
+  }, [profiles, genderFilter, minAge, maxAge]);
 
   const handleAction = (action: 'skip' | 'like') => {
     if (filteredProfiles.length === 0) return;
@@ -102,8 +90,11 @@ const DiscoveryView: React.FC = () => {
       {/* Header */}
       <div className="w-full flex items-center justify-between mb-4 px-4 z-20">
         <div>
-          <h2 className="text-xl font-black text-white tracking-tight uppercase italic">Discovery</h2>
-          <p className="text-[9px] text-pink-500 font-bold uppercase tracking-[0.2em]">Match with your spark</p>
+          <h2 className="text-xl font-black text-white tracking-tight uppercase italic flex items-center gap-2">
+            Discovery
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse"></span>
+          </h2>
+          <p className="text-[9px] text-pink-500 font-bold uppercase tracking-[0.2em]">Live Member Matching</p>
         </div>
         <button 
           onClick={() => setShowFilters(!showFilters)}
@@ -140,45 +131,26 @@ const DiscoveryView: React.FC = () => {
               <div className="space-y-6">
                 <div className="flex items-center gap-4">
                   <span className="text-[10px] font-bold text-zinc-600 w-8">Min</span>
-                  <input 
-                    type="range" min="18" max="60" value={minAge} 
-                    onChange={(e) => { 
-                      const val = parseInt(e.target.value);
-                      setMinAge(val);
-                      if (val > maxAge) setMaxAge(val);
-                      setCurrentIndex(0);
-                    }}
-                    className="flex-1 accent-pink-600"
-                  />
+                  <input type="range" min="18" max="60" value={minAge} onChange={(e) => setMinAge(parseInt(e.target.value))} className="flex-1 accent-pink-600" />
                 </div>
                 <div className="flex items-center gap-4">
                   <span className="text-[10px] font-bold text-zinc-600 w-8">Max</span>
-                  <input 
-                    type="range" min="18" max="60" value={maxAge} 
-                    onChange={(e) => { 
-                      const val = parseInt(e.target.value);
-                      setMaxAge(val);
-                      if (val < minAge) setMinAge(val);
-                      setCurrentIndex(0);
-                    }}
-                    className="flex-1 accent-pink-600"
-                  />
+                  <input type="range" min="18" max="60" value={maxAge} onChange={(e) => setMaxAge(parseInt(e.target.value))} className="flex-1 accent-pink-600" />
                 </div>
               </div>
             </div>
 
-            <button 
-              onClick={() => setShowFilters(false)}
-              className="w-full py-4 bg-white text-black font-black text-[10px] uppercase tracking-[0.2em] rounded-2xl shadow-xl active:scale-95 transition-all"
-            >
-              APPLY FILTERS
-            </button>
+            <button onClick={() => setShowFilters(false)} className="w-full py-4 bg-white text-black font-black text-[10px] uppercase tracking-[0.2em] rounded-2xl">APPLY FILTERS</button>
           </div>
         </div>
       )}
 
       <div className="relative w-full flex-1 max-h-[650px] min-h-0">
-        {filteredProfiles.length > 0 ? (
+        {isLoading ? (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <i className="fa-solid fa-gem text-pink-500 text-3xl animate-bounce"></i>
+          </div>
+        ) : filteredProfiles.length > 0 ? (
           <div className={`
             absolute inset-0 rounded-[2.5rem] overflow-hidden glass-panel border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.6)]
             transition-all duration-500 ease-in-out
@@ -186,11 +158,7 @@ const DiscoveryView: React.FC = () => {
             ${direction === 'right' ? 'translate-x-full rotate-[15deg] opacity-0 scale-90' : ''}
             ${!direction ? 'translate-x-0 rotate-0 opacity-100 scale-100' : ''}
           `}>
-            <img 
-              src={currentProfile.photo} 
-              className="w-full h-full object-cover" 
-              alt={currentProfile.name} 
-            />
+            <img src={currentProfile.photo} className={`w-full h-full object-cover transition-all duration-1000 ${currentProfile.isPremium ? 'blur-sm hover:blur-none' : ''}`} alt={currentProfile.name} />
             <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent"></div>
             
             <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8 pt-20">
@@ -204,13 +172,13 @@ const DiscoveryView: React.FC = () => {
                     {currentProfile.distance}
                   </div>
                 </div>
-                <button className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md border border-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-all">
-                  <i className="fa-solid fa-info text-[10px]"></i>
-                </button>
+                {currentProfile.isPremium && (
+                  <div className="px-3 py-1 bg-pink-600/20 border border-pink-500/30 rounded-full">
+                    <span className="text-[8px] font-black text-pink-500 uppercase tracking-widest">Premium Content</span>
+                  </div>
+                )}
               </div>
-              <p className="text-xs md:text-sm text-zinc-300 leading-relaxed line-clamp-3 italic">
-                {currentProfile.bio}
-              </p>
+              <p className="text-xs md:text-sm text-zinc-300 leading-relaxed line-clamp-3 italic">{currentProfile.bio}</p>
             </div>
           </div>
         ) : (
@@ -218,57 +186,18 @@ const DiscoveryView: React.FC = () => {
             <div className="w-20 h-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-6">
               <i className="fa-solid fa-users-slash text-zinc-600 text-2xl"></i>
             </div>
-            <h2 className="text-xl font-black text-white uppercase tracking-widest mb-2">No matches found</h2>
-            <p className="text-zinc-500 text-xs max-w-xs leading-relaxed">Try adjusting your filters to discover more elite members in the My Doll community.</p>
-            <button 
-              onClick={() => { setGenderFilter('all'); setMinAge(18); setMaxAge(60); setCurrentIndex(0); }}
-              className="mt-8 px-8 py-3 bg-pink-600 text-white rounded-2xl font-bold uppercase tracking-widest text-[10px] shadow-xl shadow-pink-600/30 active:scale-95 transition-all"
-            >
-              RESET ALL FILTERS
-            </button>
+            <h2 className="text-xl font-black text-white uppercase tracking-widest mb-2">Finding Members...</h2>
+            <p className="text-zinc-500 text-xs max-w-xs leading-relaxed">Checking for new members in the club. Discovery auto-refreshes every few seconds.</p>
           </div>
-        )}
-
-        {/* Stack Preview */}
-        {filteredProfiles.length > 1 && (
-          <>
-            <div className="absolute -bottom-2 left-4 right-4 h-24 bg-zinc-900 rounded-[2.5rem] -z-10 opacity-40"></div>
-            <div className="absolute -bottom-4 left-10 right-10 h-24 bg-zinc-900 rounded-[2.5rem] -z-20 opacity-20"></div>
-          </>
         )}
       </div>
 
       <div className="flex items-center gap-4 md:gap-6 mt-6 md:mt-10 mb-2">
-        <button 
-          onClick={() => handleAction('skip')}
-          disabled={filteredProfiles.length === 0}
-          className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-zinc-900 border border-red-500/20 flex items-center justify-center text-red-500 text-lg shadow-xl hover:bg-red-500 hover:text-white hover:shadow-red-500/30 active:scale-90 transition-all disabled:opacity-20 disabled:cursor-not-allowed"
-        >
-          <i className="fa-solid fa-xmark"></i>
-        </button>
-        <button className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-zinc-900 border border-white/5 flex items-center justify-center text-zinc-500 hover:text-white transition-all">
-          <i className="fa-solid fa-star text-xs"></i>
-        </button>
-        <button 
-          onClick={() => handleAction('like')}
-          disabled={filteredProfiles.length === 0}
-          className="w-16 h-16 md:w-20 md:h-20 rounded-[2rem] bg-pink-600 flex items-center justify-center text-white text-2xl md:text-3xl shadow-2xl shadow-pink-600/40 hover:bg-pink-500 hover:scale-105 active:scale-90 transition-all disabled:opacity-20 disabled:cursor-not-allowed"
-        >
-          <i className="fa-solid fa-heart"></i>
-        </button>
-        <button className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-zinc-900 border border-white/5 flex items-center justify-center text-zinc-500 hover:text-white transition-all">
-          <i className="fa-solid fa-bolt text-xs"></i>
-        </button>
-        <button 
-          disabled={filteredProfiles.length === 0}
-          className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-zinc-900 border border-indigo-500/20 flex items-center justify-center text-indigo-400 text-lg shadow-xl hover:bg-indigo-600 hover:text-white hover:shadow-indigo-600/30 active:scale-90 transition-all disabled:opacity-20 disabled:cursor-not-allowed"
-          onClick={() => handleAction('like')}
-        >
-          <i className="fa-solid fa-chevron-right"></i>
-        </button>
+        <button onClick={() => handleAction('skip')} className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-zinc-900 border border-red-500/20 flex items-center justify-center text-red-500 text-lg shadow-xl hover:bg-red-500 hover:text-white transition-all"><i className="fa-solid fa-xmark"></i></button>
+        <button onClick={() => handleAction('like')} className="w-16 h-16 md:w-20 md:h-20 rounded-[2rem] bg-pink-600 flex items-center justify-center text-white text-2xl md:text-3xl shadow-2xl shadow-pink-600/40 hover:bg-pink-500 hover:scale-105 transition-all"><i className="fa-solid fa-heart"></i></button>
+        <button onClick={() => handleAction('like')} className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-zinc-900 border border-indigo-500/20 flex items-center justify-center text-indigo-400 text-lg shadow-xl hover:bg-indigo-600 hover:text-white transition-all"><i className="fa-solid fa-chevron-right"></i></button>
       </div>
-
-      <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-[0.3em] pb-1">Refine your circle in settings</p>
+      <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-[0.3em] pb-1">Real-time matching active</p>
     </div>
   );
 };
