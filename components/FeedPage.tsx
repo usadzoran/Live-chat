@@ -26,42 +26,22 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
 
   const PULL_THRESHOLD = 80;
 
-  const fetchGlobalFeed = useCallback(async (isSilent: boolean = false) => {
-    const globalPubs = await db.getGlobalPublications();
-    
-    setPublications(prev => {
-      // If we have new posts and we're not at the top, show the "New Activity" pill
-      if (isSilent && globalPubs.length > prev.length && prev.length > 0) {
-        // Only show toast if user is scrolled down
-        if (containerRef.current && containerRef.current.scrollTop > 100) {
-          setShowNewPostsToast(true);
-        } else {
-          // If at top, just update naturally
-          return globalPubs;
-        }
-        return prev; // Keep old until they click toast or manual refresh
-      }
-      return globalPubs;
-    });
-  }, []);
-
-  // Listen for storage events (Realtime simulation across tabs)
+  // Real-time Firestore Subscription
   useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key?.includes('mydoll_cloud_db')) {
-        fetchGlobalFeed(true);
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    
-    fetchGlobalFeed();
-    const interval = setInterval(() => fetchGlobalFeed(true), 8000); // Poll every 8s for "Realtime" feel
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
-    };
-  }, [fetchGlobalFeed]);
+    const unsubscribe = db.subscribeToFeed((newPubs) => {
+      setPublications(prev => {
+        // If we are getting new posts while scrolled down, show indicator
+        if (newPubs.length > prev.length && prev.length > 0) {
+          if (containerRef.current && containerRef.current.scrollTop > 100) {
+            setShowNewPostsToast(true);
+            return prev; // Keep old view until they click toast
+          }
+        }
+        return newPubs;
+      });
+    });
+    return () => unsubscribe();
+  }, []);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (containerRef.current?.scrollTop === 0) {
@@ -76,14 +56,9 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
     const diff = currentY - startY.current;
     
     if (diff > 0) {
-      // Add resistance to the pull
       const dampedDiff = Math.min(diff * 0.4, 120);
       setPullDistance(dampedDiff);
-      
-      // Prevent browser default pull-to-refresh on mobile
-      if (diff > 10) {
-        if (e.cancelable) e.preventDefault();
-      }
+      if (diff > 10 && e.cancelable) e.preventDefault();
     }
   };
 
@@ -100,34 +75,30 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
     setIsRefreshing(true);
     
     try {
-      // Simulate/Trigger an AI post to make the feed feel alive on refresh
+      // Fetch latest explicitly or add an AI post for life
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: 'Generate a short luxury social post for an elite club. Use different rich personas. Return JSON: { "username": "string", "content": "string", "type": "text" | "image" }',
+        contents: 'Generate a very short luxury post for an elite club. Return JSON: { "username": "string", "content": "string", "type": "text" }',
         config: { responseMimeType: 'application/json' }
       });
 
       const data = JSON.parse(response.text || '{}');
       const newUpdate: Publication = {
         id: Math.random().toString(36).substr(2, 9),
-        user: data.username || 'EliteMember',
+        user: data.username || 'VIP_Guest',
         userAvatar: `https://ui-avatars.com/api/?name=${data.username || 'Elite'}&background=random&color=fff`,
-        type: data.type || 'text',
-        content: data.type === 'image' ? 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80' : data.content,
-        description: data.type === 'image' ? data.content : undefined,
-        likes: Math.floor(Math.random() * 50),
+        type: 'text',
+        content: data.content,
+        likes: 0,
         dislikes: 0,
         comments: [],
         timestamp: new Date()
       };
 
       await db.addPublication(newUpdate);
-      await fetchGlobalFeed();
     } catch (error) {
-      console.error("Manual refresh failed", error);
-      // Still fetch what we have if AI fails
-      await fetchGlobalFeed();
+      console.error("Manual refresh sync error", error);
     } finally {
       setIsRefreshing(false);
     }
@@ -149,53 +120,45 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
       comments: [],
       timestamp: new Date()
     };
+    
     await db.addPublication(newPub);
     setNewPostText('');
     setMediaUrl(null);
     setSelectedType('text');
-    await fetchGlobalFeed();
-    // Scroll to top to see new post
     containerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleInteraction = async (pubId: string, action: 'like' | 'dislike') => {
-    // Optimistic UI Update
-    setPublications(prev => prev.map(p => {
-      if (p.id === pubId) {
-        const updated = { 
-          ...p, 
-          likes: action === 'like' ? p.likes + 1 : p.likes, 
-          dislikes: action === 'dislike' ? p.dislikes + 1 : p.dislikes 
-        };
-        db.updatePublication(updated);
-        return updated;
-      }
-      return p;
-    }));
+    const pub = publications.find(p => p.id === pubId);
+    if (!pub) return;
+
+    const updated = { 
+      ...pub, 
+      likes: action === 'like' ? pub.likes + 1 : pub.likes, 
+      dislikes: action === 'dislike' ? pub.dislikes + 1 : pub.dislikes 
+    };
+    
+    await db.updatePublication(updated);
   };
 
   const addComment = async (pubId: string, text: string) => {
     if (!text.trim()) return;
+    const pub = publications.find(p => p.id === pubId);
+    if (!pub) return;
+
     const newComment: Comment = { 
       id: Math.random().toString(36).substr(2, 9), 
       user: user.name, 
       text, 
       timestamp: new Date() 
     };
-    setPublications(prev => prev.map(p => {
-      if (p.id === pubId) {
-        const updated = { ...p, comments: [...p.comments, newComment] };
-        db.updatePublication(updated);
-        return updated;
-      }
-      return p;
-    }));
+    
+    const updated = { ...pub, comments: [...pub.comments, newComment] };
+    await db.updatePublication(updated);
   };
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-zinc-950">
-      
-      {/* Pull down indicator background */}
       <div 
         className="absolute top-0 left-0 right-0 flex items-center justify-center pointer-events-none transition-opacity"
         style={{ height: pullDistance, opacity: pullDistance / PULL_THRESHOLD }}
@@ -205,10 +168,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
               {isRefreshing ? (
                 <i className="fa-solid fa-circle-notch animate-spin"></i>
               ) : (
-                <i 
-                  className="fa-solid fa-gem" 
-                  style={{ transform: `rotate(${pullDistance * 4}deg)` }}
-                ></i>
+                <i className="fa-solid fa-gem" style={{ transform: `rotate(${pullDistance * 4}deg)` }}></i>
               )}
            </div>
            <span className="text-[8px] font-black uppercase tracking-[0.2em] text-zinc-600">
@@ -228,36 +188,33 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
           transition: isPulling.current ? 'none' : 'transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)' 
         }}
       >
-        {/* Floating New Posts Button */}
         {showNewPostsToast && (
           <div 
-            onClick={() => { fetchGlobalFeed(); setShowNewPostsToast(false); containerRef.current?.scrollTo({top: 0, behavior: 'smooth'}); }} 
+            onClick={() => { window.location.reload(); }} 
             className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 bg-pink-600 rounded-full shadow-2xl shadow-pink-600/40 text-[10px] font-black uppercase tracking-[0.2em] text-white cursor-pointer border border-white/20 animate-in fade-in slide-in-from-top-4 duration-500"
           >
-            <i className="fa-solid fa-arrow-up mr-2"></i>
-            New Elite Activity
+            <i className="fa-solid fa-cloud-arrow-down mr-2"></i>
+            Load New Updates
           </div>
         )}
 
         <div className="max-w-3xl mx-auto space-y-6 pt-4">
-          {/* Header */}
           <div className="flex items-center justify-between px-4">
             <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter flex items-center gap-3">
               Elite Feed
               <div className="flex gap-1 items-center">
                  <div className="w-1.5 h-1.5 rounded-full bg-pink-500 animate-pulse"></div>
-                 <span className="text-[8px] text-pink-500 not-italic tracking-widest uppercase">Live</span>
+                 <span className="text-[8px] text-pink-500 not-italic tracking-widest uppercase">Cloud Sync Active</span>
               </div>
             </h2>
           </div>
 
-          {/* Create Publication */}
           <div className="glass-panel p-6 lg:p-8 rounded-[2.5rem] border-white/5 shadow-2xl bg-gradient-to-br from-zinc-900/50 to-transparent">
             <div className="flex gap-4 mb-4">
               <img src={user.avatar || `https://ui-avatars.com/api/?name=${user.name}&background=6366f1&color=fff`} className="w-12 h-12 rounded-2xl shadow-lg" alt="avatar" />
               <textarea
                 className="flex-1 bg-black/40 border border-white/10 rounded-2xl p-4 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-pink-500/50 resize-none transition-all"
-                placeholder="What's on your elite mind?" rows={2} value={newPostText} onChange={(e) => setNewPostText(e.target.value)}
+                placeholder="Share with the club..." rows={2} value={newPostText} onChange={(e) => setNewPostText(e.target.value)}
               />
             </div>
 
@@ -268,10 +225,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
                  ) : (
                    <video src={mediaUrl} className="w-full h-full object-cover" autoPlay muted loop />
                  )}
-                 <button 
-                   onClick={() => setMediaUrl(null)}
-                   className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-red-600 transition-all backdrop-blur-md border border-white/10"
-                 >
+                 <button onClick={() => setMediaUrl(null)} className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-red-600 transition-all backdrop-blur-md border border-white/10">
                    <i className="fa-solid fa-xmark"></i>
                  </button>
               </div>
@@ -288,44 +242,34 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
                     key={type.id} 
                     onClick={() => {
                       setSelectedType(type.id as any);
-                      if (type.id !== 'text') {
-                        fileInputRef.current?.click();
-                      }
+                      if (type.id !== 'text') fileInputRef.current?.click();
                     }} 
                     className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${selectedType === type.id ? 'bg-pink-600 text-white shadow-xl shadow-pink-600/20' : 'bg-white/5 text-zinc-500 hover:bg-white/10 border border-white/5'}`}
                   >
                     <i className={`fa-solid ${type.icon}`}></i> {type.label}
                   </button>
                 ))}
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  hidden 
-                  accept={selectedType === 'image' ? "image/*" : "video/*"} 
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      const reader = new FileReader();
-                      reader.onloadend = () => setMediaUrl(reader.result as string);
-                      reader.readAsDataURL(file);
-                    }
-                  }} 
-                />
+                <input type="file" ref={fileInputRef} hidden accept={selectedType === 'image' ? "image/*" : "video/*"} onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => setMediaUrl(reader.result as string);
+                    reader.readAsDataURL(file);
+                  }
+                }} />
               </div>
               <button onClick={handlePost} className="px-10 py-3 bg-pink-600 hover:bg-pink-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-2xl shadow-pink-600/30 active:scale-95">PUBLISH</button>
             </div>
           </div>
 
-          {/* Global Publications List */}
           <div className="space-y-8 pb-10">
             {publications.map((pub) => (
               <PublicationCard key={pub.id} pub={pub} onInteraction={handleInteraction} onComment={addComment} />
             ))}
-            
             {publications.length === 0 && (
               <div className="py-20 flex flex-col items-center justify-center opacity-20 text-center space-y-4">
-                 <i className="fa-solid fa-wind text-5xl"></i>
-                 <p className="text-xs font-black uppercase tracking-widest">Feed is being provisioned...</p>
+                 <i className="fa-solid fa-cloud text-5xl"></i>
+                 <p className="text-xs font-black uppercase tracking-widest">Awaiting cloud stream...</p>
               </div>
             )}
           </div>
@@ -370,7 +314,7 @@ const PublicationCard: React.FC<PublicationCardProps> = ({ pub, onInteraction, o
         </div>
 
         {pub.type === 'text' ? (
-          <p className="text-sm lg:text-base text-zinc-200 leading-relaxed mb-6 font-medium selection:bg-pink-500/30">{pub.content}</p>
+          <p className="text-sm lg:text-base text-zinc-200 leading-relaxed mb-6 font-medium">{pub.content}</p>
         ) : (
           <div className="space-y-4 mb-6">
              {pub.description && <p className="text-sm text-zinc-300 font-medium">{pub.description}</p>}
@@ -378,40 +322,25 @@ const PublicationCard: React.FC<PublicationCardProps> = ({ pub, onInteraction, o
                 {pub.type === 'image' ? (
                   <img src={pub.content} className="w-full h-auto object-cover max-h-[600px] group-hover:scale-[1.02] transition-transform duration-700" alt="post" />
                 ) : (
-                  <video 
-                    ref={videoRef}
-                    src={pub.content} 
-                    className="w-full h-auto object-cover max-h-[600px]" 
-                    autoPlay 
-                    muted 
-                    loop 
-                    playsInline 
-                  />
+                  <video ref={videoRef} src={pub.content} className="w-full h-auto object-cover max-h-[600px]" autoPlay muted loop playsInline />
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
              </div>
           </div>
         )}
 
         <div className="flex items-center justify-between pt-6 border-t border-white/5">
           <div className="flex gap-4 lg:gap-8">
-            <button 
-              onClick={() => onInteraction(pub.id, 'like')} 
-              className="flex items-center gap-3 text-zinc-500 hover:text-pink-500 transition-all active:scale-125 group"
-            >
+            <button onClick={() => onInteraction(pub.id, 'like')} className="flex items-center gap-3 text-zinc-500 hover:text-pink-500 transition-all active:scale-125 group">
               <div className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center group-hover:bg-pink-500/10 group-active:text-pink-500 transition-all shadow-lg">
                 <i className="fa-solid fa-heart text-xs"></i>
               </div>
               <span className="text-[10px] font-black tracking-widest">{pub.likes}</span>
             </button>
-            <button 
-              onClick={() => setShowComments(!showComments)} 
-              className={`flex items-center gap-3 transition-all active:scale-95 group ${showComments ? 'text-indigo-400' : 'text-zinc-500 hover:text-indigo-400'}`}
-            >
+            <button onClick={() => setShowComments(!showComments)} className={`flex items-center gap-3 transition-all active:scale-95 group ${showComments ? 'text-indigo-400' : 'text-zinc-500 hover:text-indigo-400'}`}>
               <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shadow-lg transition-all ${showComments ? 'bg-indigo-500/10' : 'bg-white/5'}`}>
                 <i className="fa-solid fa-comment text-xs"></i>
               </div>
-              <span className="text-[10px] font-black tracking-widest">{pub.comments.length}</span>
+              <span className="text-[10px] font-black tracking-widest">{pub.comments?.length || 0}</span>
             </button>
           </div>
           <button className="flex items-center gap-3 text-zinc-600 hover:text-white transition-all active:scale-95 group">
@@ -425,7 +354,7 @@ const PublicationCard: React.FC<PublicationCardProps> = ({ pub, onInteraction, o
       {showComments && (
         <div className="bg-black/20 p-6 lg:p-8 border-t border-white/5 space-y-6 animate-in slide-in-from-top-4 duration-500">
           <div className="space-y-4 max-h-80 overflow-y-auto hide-scrollbar px-1">
-            {pub.comments.map(c => (
+            {pub.comments?.map(c => (
               <div key={c.id} className="flex gap-4 animate-in fade-in slide-in-from-left-2 duration-300">
                 <img src={`https://ui-avatars.com/api/?name=${c.user}&background=3f3f46&color=fff`} className="w-8 h-8 rounded-xl shrink-0 shadow-md" alt="avatar" />
                 <div className="flex-1 bg-zinc-900/80 rounded-2xl p-4 border border-white/5 shadow-inner">
@@ -433,13 +362,10 @@ const PublicationCard: React.FC<PublicationCardProps> = ({ pub, onInteraction, o
                       <p className="text-[10px] font-black text-white uppercase tracking-widest">{c.user}</p>
                       <span className="text-[8px] text-zinc-700 font-bold uppercase">{new Date(c.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                    </div>
-                   <p className="text-xs text-zinc-400 leading-relaxed selection:bg-pink-500/20">{c.text}</p>
+                   <p className="text-xs text-zinc-400 leading-relaxed">{c.text}</p>
                 </div>
               </div>
             ))}
-            {pub.comments.length === 0 && (
-              <p className="text-[10px] text-zinc-700 font-black uppercase text-center tracking-[0.2em] py-4">No elite thoughts yet</p>
-            )}
           </div>
           <div className="flex gap-3 pt-6 border-t border-white/5">
             <input 

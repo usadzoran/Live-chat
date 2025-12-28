@@ -1,7 +1,38 @@
 
+import { initializeApp } from 'firebase/app';
+import { 
+  getFirestore, 
+  doc, 
+  getDoc, 
+  setDoc, 
+  updateDoc, 
+  collection, 
+  query, 
+  orderBy, 
+  getDocs, 
+  onSnapshot,
+  deleteDoc,
+  increment,
+  arrayUnion,
+  where,
+  Timestamp,
+  limit
+} from 'firebase/firestore';
 import { WithdrawalRecord, Publication, AdConfig } from '../types';
 
-const DB_NAME = 'mydoll_cloud_db_v3';
+// NOTE: Replace these placeholder values with your actual Firebase project configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyAs-REPLACE_WITH_YOUR_KEY",
+  authDomain: "mydoll-elite.firebaseapp.com",
+  projectId: "mydoll-elite",
+  storageBucket: "mydoll-elite.appspot.com",
+  messagingSenderId: "123456789",
+  appId: "1:123456789:web:abcdef"
+};
+
+const app = initializeApp(firebaseConfig);
+const db_fs = getFirestore(app);
+
 export const MIN_WITHDRAW_USD = 20;
 export const GEMS_PER_DOLLAR = 100;
 
@@ -32,215 +63,107 @@ export interface UserDB {
   joinedAt?: string;
 }
 
-export interface PlatformDB {
-  revenue: number;
-  totalPayouts: number;
-  transactions: string[]; 
-  merchantConfig: {
-    clientId: string;
-    clientSecret: string;
-    isLive: boolean;
-  };
-  globalPublications: Publication[];
-  ads: AdConfig[];
-}
-
 class DatabaseService {
-  private data: { users: Record<string, UserDB>; platform: PlatformDB };
-
-  constructor() {
-    const saved = localStorage.getItem(DB_NAME);
-    if (saved) {
-      this.data = JSON.parse(saved);
-      if (!this.data.platform.globalPublications) this.data.platform.globalPublications = [];
-      if (!this.data.platform.ads) {
-        this.data.platform.ads = [
-          { id: '1', placement: 'under_header', enabled: true, title: 'Luxury Watches', imageUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=400&q=80', link: '#' },
-        ];
-      }
-    } else {
-      this.data = {
-        users: {
-          'admin@mydoll.club': {
-            name: 'Wahab Fresh',
-            email: 'admin@mydoll.club',
-            diamonds: 0,
-            usd_balance: 0,
-            withdrawals: [],
-            album: [],
-            bio: 'Master Node Administrator',
-            avatar: 'https://ui-avatars.com/api/?name=Wahab+Fresh&background=0891b2&color=fff',
-            cover: 'https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=1200&q=80',
-            gender: 'men',
-            country: 'Global',
-            referralCount: 0,
-            status: 'active',
-            role: 'admin',
-            joinedAt: new Date().toISOString()
-          }
-        },
-        platform: { 
-          revenue: 0,
-          totalPayouts: 0,
-          transactions: [],
-          merchantConfig: {
-            clientId: "AchOwxrubWXLdT64U9AmBydM9n7EEgA_psh3nXWi0PPhRvxZRtdHNCpXYxggnKV-dMef3JGMMzdeGvEW",
-            clientSecret: "EP_y5ZbwgqdVgJ4GJAx1TTIFiHgn_g47xviitWpoCcX9crWi8uEwVjUqtrdlBDU3aTO6DSEEsUwqHb3b",
-            isLive: true
-          },
-          globalPublications: [],
-          ads: [
-            { id: '1', placement: 'under_header', enabled: true, title: 'Elite Rewards', imageUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=400&q=80', link: '#' },
-          ]
-        }
-      };
-      this.save();
-    }
-  }
-
-  private save() {
-    localStorage.setItem(DB_NAME, JSON.stringify(this.data));
-  }
-
-  async resetAllWallets(): Promise<void> {
-    this.data.platform.revenue = 0;
-    this.data.platform.totalPayouts = 0;
-    this.data.platform.transactions = [];
-    Object.keys(this.data.users).forEach(email => {
-      this.data.users[email].diamonds = 0;
-      this.data.users[email].usd_balance = 0;
-      this.data.users[email].withdrawals = [];
-    });
-    this.save();
-  }
-
   async getUser(email: string): Promise<UserDB | null> {
-    return this.data.users[email] || null;
+    const userRef = doc(db_fs, 'users', email.toLowerCase());
+    const snap = await getDoc(userRef);
+    if (snap.exists()) return snap.data() as UserDB;
+    return null;
   }
 
   async getAllUsers(): Promise<UserDB[]> {
-    return Object.values(this.data.users).sort((a, b) => 
-      new Date(b.joinedAt || 0).getTime() - new Date(a.joinedAt || 0).getTime()
-    );
-  }
-
-  async getAllWithdrawals(): Promise<(WithdrawalRecord & { userEmail: string; userName: string })[]> {
-    const all: (WithdrawalRecord & { userEmail: string; userName: string })[] = [];
-    Object.values(this.data.users).forEach(user => {
-      (user.withdrawals || []).forEach(w => {
-        all.push({ ...w, userEmail: user.email, userName: user.name });
-      });
-    });
-    return all.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  }
-
-  async deleteUser(email: string): Promise<void> {
-    if (email === 'admin@mydoll.club') return;
-    delete this.data.users[email];
-    this.save();
+    const q = query(collection(db_fs, 'users'), orderBy('joinedAt', 'desc'));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => d.data() as UserDB);
   }
 
   async upsertUser(user: UserDB): Promise<UserDB> {
-    const isNew = !this.data.users[user.email];
-    if (isNew) {
-      user.joinedAt = user.joinedAt || new Date().toISOString();
-      user.status = user.status || 'active';
-      user.role = user.role || (user.gender === 'women' ? 'doll' : 'mentor');
-    }
-    this.data.users[user.email] = {
-      ...this.data.users[user.email],
-      ...user
+    const userRef = doc(db_fs, 'users', user.email.toLowerCase());
+    const existing = await this.getUser(user.email);
+    
+    const data = {
+      ...user,
+      joinedAt: existing?.joinedAt || new Date().toISOString(),
+      status: user.status || existing?.status || 'active',
+      role: user.role || existing?.role || (user.gender === 'women' ? 'doll' : 'mentor'),
+      diamonds: user.diamonds ?? existing?.diamonds ?? 50,
+      usd_balance: user.usd_balance ?? existing?.usd_balance ?? 0,
+      withdrawals: user.withdrawals || existing?.withdrawals || [],
+      album: user.album || existing?.album || []
     };
-    this.save();
-    return this.data.users[user.email];
+
+    await setDoc(userRef, data, { merge: true });
+    return data;
   }
 
   async toggleUserStatus(email: string): Promise<void> {
-    const user = this.data.users[email];
+    const user = await this.getUser(email);
     if (user) {
-      user.status = user.status === 'banned' ? 'active' : 'banned';
-      this.save();
+      const userRef = doc(db_fs, 'users', email.toLowerCase());
+      await updateDoc(userRef, {
+        status: user.status === 'banned' ? 'active' : 'banned'
+      });
     }
+  }
+
+  async deleteUser(email: string): Promise<void> {
+    if (email.toLowerCase() === 'admin@mydoll.club') return;
+    await deleteDoc(doc(db_fs, 'users', email.toLowerCase()));
   }
 
   async getPlatformRevenue(): Promise<number> {
-    return this.data.platform.revenue;
-  }
-
-  async getAds(): Promise<AdConfig[]> {
-    return this.data.platform.ads;
-  }
-
-  async updateAdConfig(updatedAd: AdConfig): Promise<void> {
-    const exists = this.data.platform.ads.find(a => a.id === updatedAd.id);
-    if (exists) {
-      this.data.platform.ads = this.data.platform.ads.map(a => 
-        a.id === updatedAd.id ? updatedAd : a
-      );
-    } else {
-      this.data.platform.ads.push(updatedAd);
-    }
-    this.save();
-  }
-
-  async deleteAd(id: string): Promise<void> {
-    this.data.platform.ads = this.data.platform.ads.filter(a => a.id !== id);
-    this.save();
-  }
-
-  async getGlobalPublications(): Promise<Publication[]> {
-    return [...this.data.platform.globalPublications].sort((a, b) => 
-      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    );
-  }
-
-  async addPublication(pub: Publication): Promise<void> {
-    this.data.platform.globalPublications.unshift(pub);
-    this.save();
-  }
-
-  async updatePublication(updatedPub: Publication): Promise<void> {
-    this.data.platform.globalPublications = this.data.platform.globalPublications.map(p => 
-      p.id === updatedPub.id ? updatedPub : p
-    );
-    this.save();
+    const statsRef = doc(db_fs, 'platform', 'stats');
+    const snap = await getDoc(statsRef);
+    return snap.exists() ? snap.data().revenue : 0;
   }
 
   async getPlatformStats() {
-    const users = Object.values(this.data.users);
-    const totalDiamondsInSystem = users.reduce((sum, u) => sum + u.diamonds, 0);
+    const statsRef = doc(db_fs, 'platform', 'stats');
+    const snap = await getDoc(statsRef);
+    const users = await this.getAllUsers();
+    const totalDiamonds = users.reduce((sum, u) => sum + (u.diamonds || 0), 0);
+    
+    const data = snap.exists() ? snap.data() : { revenue: 0, totalPayouts: 0 };
+    
     return {
-      revenue: this.data.platform.revenue,
-      totalPayouts: this.data.platform.totalPayouts,
-      merchantId: this.data.platform.merchantConfig.clientId,
-      isLive: this.data.platform.merchantConfig.isLive,
+      revenue: data.revenue,
+      totalPayouts: data.totalPayouts,
       userCount: users.length,
-      liabilityUsd: totalDiamondsInSystem / GEMS_PER_DOLLAR,
+      liabilityUsd: totalDiamonds / GEMS_PER_DOLLAR,
       dollCount: users.filter(u => u.role === 'doll').length,
       mentorCount: users.filter(u => u.role === 'mentor').length,
     };
   }
 
   async capturePaypalOrder(orderID: string, userEmail: string, diamondAmount: number, price: number): Promise<{success: boolean, message: string}> {
-    if (this.data.platform.transactions.includes(orderID)) {
+    const txRef = doc(db_fs, 'transactions', orderID);
+    const txSnap = await getDoc(txRef);
+    
+    if (txSnap.exists()) {
       return { success: false, message: "Transaction already processed." };
     }
-    this.data.platform.revenue += price;
-    this.data.platform.transactions.push(orderID);
-    const user = this.data.users[userEmail];
-    if (user) user.diamonds += diamondAmount;
-    this.save();
+
+    // Atomic update
+    await setDoc(txRef, { userEmail, diamondAmount, price, timestamp: Timestamp.now() });
+    
+    const statsRef = doc(db_fs, 'platform', 'stats');
+    await setDoc(statsRef, { revenue: increment(price) }, { merge: true });
+
+    const userRef = doc(db_fs, 'users', userEmail.toLowerCase());
+    await updateDoc(userRef, {
+      diamonds: increment(diamondAmount)
+    });
+
     return { success: true, message: "Payment captured successfully!" };
   }
 
   async requestWithdrawal(userEmail: string, paypalEmail: string, gemsToConvert: number): Promise<{success: boolean, message: string}> {
-    const user = this.data.users[userEmail];
+    const user = await this.getUser(userEmail);
     if (!user) return { success: false, message: "User not found." };
     
-    // Check minimum withdrawal: $20 = 2000 gems
     const minGemsRequired = MIN_WITHDRAW_USD * GEMS_PER_DOLLAR;
     if (gemsToConvert < minGemsRequired) {
-      return { success: false, message: `Minimum withdrawal is $${MIN_WITHDRAW_USD} (${minGemsRequired} Gems).` };
+      return { success: false, message: `Minimum withdrawal is $${MIN_WITHDRAW_USD}.` };
     }
 
     if (user.diamonds < gemsToConvert) {
@@ -248,8 +171,6 @@ class DatabaseService {
     }
 
     const amountUsd = gemsToConvert / GEMS_PER_DOLLAR;
-    user.diamonds -= gemsToConvert;
-    this.data.platform.totalPayouts += amountUsd;
     const record: WithdrawalRecord = {
       id: `WTHDRW_${Date.now()}`,
       amountUsd,
@@ -258,9 +179,97 @@ class DatabaseService {
       status: 'completed',
       timestamp: new Date()
     };
-    user.withdrawals = [record, ...(user.withdrawals || [])];
-    this.save();
+
+    const userRef = doc(db_fs, 'users', userEmail.toLowerCase());
+    await updateDoc(userRef, {
+      diamonds: increment(-gemsToConvert),
+      withdrawals: arrayUnion(record)
+    });
+
+    const statsRef = doc(db_fs, 'platform', 'stats');
+    await setDoc(statsRef, { totalPayouts: increment(amountUsd) }, { merge: true });
+
     return { success: true, message: "Withdrawal completed." };
+  }
+
+  // Real-time Feed & Publications
+  async getGlobalPublications(): Promise<Publication[]> {
+    const q = query(collection(db_fs, 'publications'), orderBy('timestamp', 'desc'), limit(50));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => {
+      const data = d.data();
+      return {
+        ...data,
+        timestamp: data.timestamp?.toDate() || new Date()
+      } as Publication;
+    });
+  }
+
+  async addPublication(pub: Publication): Promise<void> {
+    const pubRef = doc(db_fs, 'publications', pub.id);
+    await setDoc(pubRef, {
+      ...pub,
+      timestamp: Timestamp.now()
+    });
+  }
+
+  async updatePublication(updatedPub: Publication): Promise<void> {
+    const pubRef = doc(db_fs, 'publications', updatedPub.id);
+    await updateDoc(pubRef, {
+      likes: updatedPub.likes,
+      dislikes: updatedPub.dislikes,
+      comments: updatedPub.comments
+    });
+  }
+
+  subscribeToFeed(callback: (pubs: Publication[]) => void) {
+    const q = query(collection(db_fs, 'publications'), orderBy('timestamp', 'desc'), limit(50));
+    return onSnapshot(q, (snap) => {
+      const pubs = snap.docs.map(d => {
+        const data = d.data();
+        return {
+          ...data,
+          timestamp: data.timestamp?.toDate() || new Date()
+        } as Publication;
+      });
+      callback(pubs);
+    });
+  }
+
+  async getAds(): Promise<AdConfig[]> {
+    const snap = await getDocs(collection(db_fs, 'ads'));
+    return snap.docs.map(d => d.data() as AdConfig);
+  }
+
+  async updateAdConfig(ad: AdConfig): Promise<void> {
+    await setDoc(doc(db_fs, 'ads', ad.id), ad, { merge: true });
+  }
+
+  async deleteAd(id: string): Promise<void> {
+    await deleteDoc(doc(db_fs, 'ads', id));
+  }
+
+  async getAllWithdrawals(): Promise<any[]> {
+    const users = await this.getAllUsers();
+    let all: any[] = [];
+    users.forEach(u => {
+      if (u.withdrawals) {
+        all = [...all, ...u.withdrawals.map(w => ({ ...w, userEmail: u.email, userName: u.name }))];
+      }
+    });
+    return all.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }
+
+  async resetAllWallets(): Promise<void> {
+    const users = await this.getAllUsers();
+    for (const u of users) {
+      await updateDoc(doc(db_fs, 'users', u.email.toLowerCase()), {
+        diamonds: 0,
+        usd_balance: 0,
+        withdrawals: []
+      });
+    }
+    await setDoc(doc(db_fs, 'platform', 'stats'), { revenue: 0, totalPayouts: 0 });
   }
 }
 
