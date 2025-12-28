@@ -15,7 +15,10 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
     ...user,
     avatar: user.avatar || `https://ui-avatars.com/api/?name=${user.name}&size=256&background=f472b6&color=fff`,
     cover: user.cover || "https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=1200&q=80",
-    album: user.album || []
+    album: user.album || [],
+    dob: user.dob || '',
+    gender: user.gender || 'women',
+    country: user.country || ''
   });
   
   const [isEditing, setIsEditing] = useState(false);
@@ -180,16 +183,14 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
               {isEditing ? 'Save Changes' : 'Edit Profile'}
             </button>
           </div>
-          {isEditing ? (
-            <textarea 
-              className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-zinc-300 focus:outline-none focus:border-pink-500/50 mt-2 h-20"
-              value={formData.bio || ''}
-              placeholder="Tell your fans something about you..."
-              onChange={(e) => setFormData({...formData, bio: e.target.value})}
-            />
-          ) : (
+          <div className="flex items-center gap-3 justify-center md:justify-start">
             <p className="text-zinc-500 text-xs italic">{formData.bio || 'Elite Member of My Doll Circle'}</p>
-          )}
+            {formData.country && (
+              <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded-md text-zinc-400 font-bold uppercase tracking-widest border border-white/5">
+                {formData.country}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -325,6 +326,84 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
                  </table>
                </div>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'settings' && (
+          <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+             <div className="glass-panel p-8 rounded-[2.5rem] border-white/10 space-y-6">
+                <div className="flex items-center gap-4 border-b border-white/5 pb-4">
+                  <i className="fa-solid fa-gear text-pink-500 text-xl"></i>
+                  <h2 className="text-xl font-black text-white uppercase tracking-widest">Account Settings</h2>
+                </div>
+
+                <div className="space-y-6">
+                   <div className="space-y-2">
+                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Full Name</label>
+                      <input 
+                        type="text" 
+                        value={formData.name}
+                        onChange={(e) => setFormData({...formData, name: e.target.value})}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-sm text-white focus:outline-none focus:border-pink-500/50"
+                        placeholder="Your display name"
+                      />
+                   </div>
+
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Date of Birth</label>
+                        <input 
+                          type="date" 
+                          value={formData.dob}
+                          onChange={(e) => setFormData({...formData, dob: e.target.value})}
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-sm text-white focus:outline-none focus:border-pink-500/50"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Gender</label>
+                        <select 
+                          value={formData.gender}
+                          onChange={(e) => setFormData({...formData, gender: e.target.value as any})}
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-sm text-white focus:outline-none focus:border-pink-500/50 appearance-none"
+                        >
+                          <option value="women">Women</option>
+                          <option value="men">Men</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                   </div>
+
+                   <div className="space-y-2">
+                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Country</label>
+                      <input 
+                        type="text" 
+                        value={formData.country}
+                        onChange={(e) => setFormData({...formData, country: e.target.value})}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-sm text-white focus:outline-none focus:border-pink-500/50"
+                        placeholder="e.g. United States"
+                      />
+                   </div>
+
+                   <div className="space-y-2">
+                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Bio / Status</label>
+                      <textarea 
+                        value={formData.bio}
+                        onChange={(e) => setFormData({...formData, bio: e.target.value})}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-sm text-white focus:outline-none focus:border-pink-500/50 h-32 resize-none"
+                        placeholder="Write something about yourself..."
+                      />
+                   </div>
+                </div>
+
+                <div className="pt-4">
+                  <button 
+                    onClick={handleSaveProfile}
+                    className="w-full py-5 bg-pink-600 text-white font-black text-xs uppercase tracking-widest rounded-[2rem] shadow-2xl shadow-pink-600/20 active:scale-95 transition-all"
+                  >
+                    Update Profile Details
+                  </button>
+                </div>
+             </div>
           </div>
         )}
       </div>

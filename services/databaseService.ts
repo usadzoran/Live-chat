@@ -20,6 +20,9 @@ export interface UserDB {
   bio?: string;
   avatar?: string;
   cover?: string;
+  dob?: string;
+  gender?: 'men' | 'women' | 'other';
+  country?: string;
 }
 
 export interface PlatformDB {
@@ -56,7 +59,9 @@ class DatabaseService {
             album: [],
             bio: 'Master Node Administrator',
             avatar: 'https://ui-avatars.com/api/?name=Wahab+Fresh&background=0891b2&color=fff',
-            cover: 'https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=1200&q=80'
+            cover: 'https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=1200&q=80',
+            gender: 'men',
+            country: 'Global'
           }
         },
         platform: { 

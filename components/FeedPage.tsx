@@ -17,12 +17,14 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
   const [publications, setPublications] = useState<Publication[]>([]);
   const [newPostText, setNewPostText] = useState('');
   const [selectedType, setSelectedType] = useState<'text' | 'image' | 'video'>('text');
+  const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   
   // Refresh State
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
   const [showNewPostsToast, setShowNewPostsToast] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const startY = useRef(0);
   const isPulling = useRef(false);
 
@@ -73,7 +75,6 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
     setIsRefreshing(true);
     
     try {
-      // AI-generated elite post to keep feed spicy
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
@@ -104,14 +105,46 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
     }
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type.startsWith('video/')) {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.onloadedmetadata = () => {
+        window.URL.revokeObjectURL(video.src);
+        if (video.duration > 8.5) {
+          alert('Video must be 8 seconds or shorter.');
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          return;
+        }
+        processFile(file);
+      };
+      video.src = URL.createObjectURL(file);
+    } else {
+      processFile(file);
+    }
+  };
+
+  const processFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setMediaUrl(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handlePost = async () => {
-    if (!newPostText.trim()) return;
+    if (selectedType === 'text' && !newPostText.trim()) return;
+    if (selectedType !== 'text' && !mediaUrl) return;
+
     const newPub: Publication = {
       id: Math.random().toString(36).substr(2, 9),
       user: user.name,
       userAvatar: `https://ui-avatars.com/api/?name=${user.name}&background=6366f1&color=fff`,
       type: selectedType,
-      content: selectedType === 'text' ? newPostText : 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=800&q=80',
+      content: selectedType === 'text' ? newPostText : mediaUrl!,
       description: selectedType !== 'text' ? newPostText : undefined,
       likes: 0,
       dislikes: 0,
@@ -120,6 +153,8 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
     };
     await db.addPublication(newPub);
     setNewPostText('');
+    setMediaUrl(null);
+    setSelectedType('text');
     await fetchGlobalFeed();
   };
 
@@ -183,16 +218,50 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
             placeholder="Share an elite update..." rows={2} value={newPostText} onChange={(e) => setNewPostText(e.target.value)}
           />
         </div>
+
+        {mediaUrl && (
+          <div className="mb-4 relative rounded-2xl overflow-hidden border border-white/10 aspect-video bg-black/40">
+             {selectedType === 'image' ? (
+               <img src={mediaUrl} className="w-full h-full object-cover" alt="Preview" />
+             ) : (
+               <video src={mediaUrl} className="w-full h-full object-cover" autoPlay muted loop />
+             )}
+             <button 
+               onClick={() => setMediaUrl(null)}
+               className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-red-600 transition-all"
+             >
+               <i className="fa-solid fa-xmark"></i>
+             </button>
+          </div>
+        )}
+
         <div className="flex flex-wrap items-center justify-between gap-4 border-t border-white/5 pt-4">
           <div className="flex gap-2 lg:gap-3">
             {[
               { id: 'text', icon: 'fa-font', label: 'Text' },
-              { id: 'image', icon: 'fa-image', label: 'Photo' }
+              { id: 'image', icon: 'fa-image', label: 'Photo' },
+              { id: 'video', icon: 'fa-clapperboard', label: 'Short' }
             ].map((type) => (
-              <button key={type.id} onClick={() => setSelectedType(type.id as any)} className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all ${selectedType === type.id ? 'bg-pink-600 text-white shadow-lg' : 'bg-white/5 text-zinc-500 hover:bg-white/10'}`}>
+              <button 
+                key={type.id} 
+                onClick={() => {
+                  setSelectedType(type.id as any);
+                  if (type.id !== 'text') {
+                    fileInputRef.current?.click();
+                  }
+                }} 
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all ${selectedType === type.id ? 'bg-pink-600 text-white shadow-lg' : 'bg-white/5 text-zinc-500 hover:bg-white/10'}`}
+              >
                 <i className={`fa-solid ${type.icon}`}></i> {type.label}
               </button>
             ))}
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              hidden 
+              accept={selectedType === 'image' ? "image/*" : "video/*"} 
+              onChange={handleFileChange} 
+            />
           </div>
           <button onClick={handlePost} className="px-8 py-2.5 bg-pink-600 hover:bg-pink-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl active:scale-95">PUBLISH</button>
         </div>
@@ -217,6 +286,7 @@ interface PublicationCardProps {
 const PublicationCard: React.FC<PublicationCardProps> = ({ pub, onInteraction, onComment }) => {
   const [commentText, setCommentText] = useState('');
   const [showComments, setShowComments] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   return (
     <div className="glass-panel rounded-[2rem] border-white/5 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500 shadow-2xl">
@@ -238,8 +308,25 @@ const PublicationCard: React.FC<PublicationCardProps> = ({ pub, onInteraction, o
         ) : (
           <div className="space-y-4 lg:space-y-6">
              {pub.description && <p className="text-sm text-zinc-300">{pub.description}</p>}
-             <div className="rounded-2xl lg:rounded-3xl overflow-hidden border border-white/5 bg-zinc-900">
-                <img src={pub.content} className="w-full h-auto object-cover max-h-[500px]" alt="post" />
+             <div className="rounded-2xl lg:rounded-3xl overflow-hidden border border-white/5 bg-zinc-900 relative">
+                {pub.type === 'image' ? (
+                  <img src={pub.content} className="w-full h-auto object-cover max-h-[500px]" alt="post" />
+                ) : (
+                  <video 
+                    ref={videoRef}
+                    src={pub.content} 
+                    className="w-full h-auto object-cover max-h-[500px]" 
+                    autoPlay 
+                    muted 
+                    loop 
+                    playsInline 
+                  />
+                )}
+                {pub.type === 'video' && (
+                  <div className="absolute top-4 right-4 px-2 py-1 bg-black/60 backdrop-blur-md rounded-md">
+                    <span className="text-[8px] font-black text-white uppercase tracking-widest">Elite Short</span>
+                  </div>
+                )}
              </div>
           </div>
         )}
