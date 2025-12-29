@@ -1,7 +1,7 @@
 
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApp, getApps } from 'firebase/app';
 import { 
-  getFirestore, 
+  getFirestore,
   doc, 
   getDoc, 
   setDoc, 
@@ -14,49 +14,41 @@ import {
   deleteDoc,
   increment,
   arrayUnion,
-  where,
   Timestamp,
-  limit
+  limit,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  enableNetwork,
+  where
 } from 'firebase/firestore';
-import { WithdrawalRecord, Publication, AdConfig } from '../types';
+import { WithdrawalRecord, Publication } from '../types';
 
 /**
- * IMPORTANT: To fix [permission-denied] errors:
- * 1. Go to your Firebase Console (https://console.firebase.google.com/)
- * 2. Select project "mydoll-elite"
- * 3. Go to "Firestore Database" -> "Rules" tab
- * 4. Change rules to:
- *    service cloud.firestore {
- *      match /databases/{database}/documents {
- *        match /{document=**} {
- *          allow read, write: if true;
- *        }
- *      }
- *    }
- * 5. Ensure your apiKey below matches the one in "Project Settings".
+ * 🛠️ Firebase Configuration for My Doll Elite (Studio Project)
  */
-
 const firebaseConfig = {
-  apiKey: "AIzaSyAs-REPLACE_WITH_YOUR_ACTUAL_KEY",
-  authDomain: "mydoll-elite.firebaseapp.com",
-  projectId: "mydoll-elite",
-  storageBucket: "mydoll-elite.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:abcdef"
+  apiKey: "AIzaSyAKnoCa3sKwZrQaUXy0PNkJ1FbsJGAOyjk",
+  authDomain: "studio-3236344976-c8013.firebaseapp.com",
+  databaseURL: "https://studio-3236344976-c8013-default-rtdb.firebaseio.com",
+  projectId: "studio-3236344976-c8013",
+  storageBucket: "studio-3236344976-c8013.firebasestorage.app",
+  messagingSenderId: "689062563273",
+  appId: "1:689062563273:web:7cfa6fdd7ad7455a81ac18"
 };
 
-const app = initializeApp(firebaseConfig);
-const db_fs = getFirestore(app);
+// Initialize App
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-export const MIN_WITHDRAW_USD = 20;
+// Initialize Firestore with explicit app attachment to fix "Component not registered" error
+const db_fs = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager()
+  })
+});
+
+export const MIN_WITHDRAW_GEMS = 2000; 
 export const GEMS_PER_DOLLAR = 100;
-
-export interface AlbumPhoto {
-  id: string;
-  url: string;
-  price: number;
-  caption?: string;
-}
 
 export interface UserDB {
   name: string;
@@ -64,7 +56,7 @@ export interface UserDB {
   diamonds: number;
   usd_balance: number; 
   withdrawals: WithdrawalRecord[];
-  album: AlbumPhoto[];
+  album: any[];
   bio?: string;
   avatar?: string;
   cover?: string;
@@ -79,14 +71,44 @@ export interface UserDB {
 }
 
 class DatabaseService {
+  private async ensureNetwork() {
+    try {
+      await enableNetwork(db_fs);
+    } catch (e) {
+      // Network already active
+    }
+  }
+
   private handleError(error: any, context: string) {
-    console.error(`Database Error in ${context}:`, error);
-    if (error.code === 'permission-denied') {
-      console.warn("CRITICAL: Permission denied. Please check your Firestore Security Rules in the Firebase Console.");
+    console.error(`Firebase [${context}]:`, error.message || error);
+  }
+
+  async calculateTotalRevenue(): Promise<number> {
+    await this.ensureNetwork();
+    try {
+      const txRef = collection(db_fs, 'transactions');
+      const q = query(txRef, where("status", "==", "COMPLETED"));
+      const snap = await getDocs(q);
+      
+      let total = 0;
+      snap.forEach((doc) => {
+        const data = doc.data();
+        total += data.price || 0; 
+      });
+
+      const statsRef = doc(db_fs, 'platform', 'stats');
+      await setDoc(statsRef, { revenue: total }, { merge: true });
+      
+      return total;
+    } catch (e) {
+      this.handleError(e, 'calculateTotalRevenue');
+      return 0;
     }
   }
 
   async getUser(email: string): Promise<UserDB | null> {
+    if (!email) return null;
+    await this.ensureNetwork();
     try {
       const userRef = doc(db_fs, 'users', email.toLowerCase());
       const snap = await getDoc(userRef);
@@ -98,6 +120,7 @@ class DatabaseService {
   }
 
   async getAllUsers(): Promise<UserDB[]> {
+    await this.ensureNetwork();
     try {
       const q = query(collection(db_fs, 'users'), orderBy('joinedAt', 'desc'));
       const snap = await getDocs(q);
@@ -130,50 +153,23 @@ class DatabaseService {
     }
   }
 
-  async toggleUserStatus(email: string): Promise<void> {
-    try {
-      const user = await this.getUser(email);
-      if (user) {
-        const userRef = doc(db_fs, 'users', email.toLowerCase());
-        await updateDoc(userRef, {
-          status: user.status === 'banned' ? 'active' : 'banned'
-        });
-      }
-    } catch (e) {
-      this.handleError(e, 'toggleUserStatus');
-    }
-  }
-
-  async deleteUser(email: string): Promise<void> {
-    if (email.toLowerCase() === 'admin@mydoll.club') return;
-    try {
-      await deleteDoc(doc(db_fs, 'users', email.toLowerCase()));
-    } catch (e) {
-      this.handleError(e, 'deleteUser');
-    }
-  }
-
   async getPlatformRevenue(): Promise<number> {
-    try {
-      const statsRef = doc(db_fs, 'platform', 'stats');
-      const snap = await getDoc(statsRef);
-      return snap.exists() ? (snap.data().revenue || 0) : 0;
-    } catch (e) {
-      this.handleError(e, 'getPlatformRevenue');
-      return 0;
-    }
+    return await this.calculateTotalRevenue();
   }
 
   async getPlatformStats() {
+    await this.ensureNetwork();
     try {
+      const revenue = await this.calculateTotalRevenue();
       const statsRef = doc(db_fs, 'platform', 'stats');
-      const snap = await getDoc(statsRef);
+      const statsSnap = await getDoc(statsRef);
+      
       const users = await this.getAllUsers();
       const totalDiamonds = users.reduce((sum, u) => sum + (u.diamonds || 0), 0);
-      const data = snap.exists() ? snap.data() : { revenue: 0, totalPayouts: 0 };
+      const data = statsSnap.data() || { totalPayouts: 0 };
       
       return {
-        revenue: data.revenue || 0,
+        revenue: revenue,
         totalPayouts: data.totalPayouts || 0,
         userCount: users.length,
         liabilityUsd: totalDiamonds / GEMS_PER_DOLLAR,
@@ -181,7 +177,6 @@ class DatabaseService {
         mentorCount: users.filter(u => u.role === 'mentor').length,
       };
     } catch (e) {
-      this.handleError(e, 'getPlatformStats');
       return { revenue: 0, totalPayouts: 0, userCount: 0, liabilityUsd: 0, dollCount: 0, mentorCount: 0 };
     }
   }
@@ -189,37 +184,35 @@ class DatabaseService {
   async capturePaypalOrder(orderID: string, userEmail: string, diamondAmount: number, price: number): Promise<{success: boolean, message: string}> {
     try {
       const txRef = doc(db_fs, 'transactions', orderID);
-      const txSnap = await getDoc(txRef);
+      await setDoc(txRef, { 
+        userEmail, 
+        diamondAmount, 
+        price, 
+        timestamp: Timestamp.now(), 
+        status: 'COMPLETED' 
+      });
       
-      if (txSnap.exists()) {
-        return { success: false, message: "Transaction already processed." };
-      }
-
-      await setDoc(txRef, { userEmail, diamondAmount, price, timestamp: Timestamp.now() });
-      const statsRef = doc(db_fs, 'platform', 'stats');
-      await setDoc(statsRef, { revenue: increment(price) }, { merge: true });
       const userRef = doc(db_fs, 'users', userEmail.toLowerCase());
       await updateDoc(userRef, { diamonds: increment(diamondAmount) });
 
-      return { success: true, message: "Payment captured successfully!" };
+      return { success: true, message: "تم شحن الجواهر بنجاح!" };
     } catch (e) {
       this.handleError(e, 'capturePaypalOrder');
-      return { success: false, message: "Payment failed due to database permission issues." };
+      return { success: false, message: "خطأ في الاتصال بالسحابة." };
     }
   }
 
   async requestWithdrawal(userEmail: string, paypalEmail: string, gemsToConvert: number): Promise<{success: boolean, message: string}> {
     try {
       const user = await this.getUser(userEmail);
-      if (!user) return { success: false, message: "User not found." };
+      if (!user) return { success: false, message: "المستخدم غير موجود." };
       
-      const minGemsRequired = MIN_WITHDRAW_USD * GEMS_PER_DOLLAR;
-      if (gemsToConvert < minGemsRequired) {
-        return { success: false, message: `Minimum withdrawal is $${MIN_WITHDRAW_USD}.` };
+      if (gemsToConvert < MIN_WITHDRAW_GEMS) {
+        return { success: false, message: `الحد الأدنى للسحب هو ${MIN_WITHDRAW_GEMS} جوهرة ($20).` };
       }
 
       if (user.diamonds < gemsToConvert) {
-        return { success: false, message: "Insufficient balance." };
+        return { success: false, message: "رصيد الجواهر غير كافٍ." };
       }
 
       const amountUsd = gemsToConvert / GEMS_PER_DOLLAR;
@@ -241,132 +234,55 @@ class DatabaseService {
       const statsRef = doc(db_fs, 'platform', 'stats');
       await setDoc(statsRef, { totalPayouts: increment(amountUsd) }, { merge: true });
 
-      return { success: true, message: "Withdrawal completed." };
+      return { success: true, message: "تم تقديم طلب السحب بنجاح!" };
     } catch (e) {
       this.handleError(e, 'requestWithdrawal');
-      return { success: false, message: "Transaction failed. Please check platform permissions." };
-    }
-  }
-
-  async getGlobalPublications(): Promise<Publication[]> {
-    try {
-      const q = query(collection(db_fs, 'publications'), orderBy('timestamp', 'desc'), limit(50));
-      const snap = await getDocs(q);
-      return snap.docs.map(d => {
-        const data = d.data();
-        return {
-          ...data,
-          timestamp: data.timestamp?.toDate() || new Date()
-        } as Publication;
-      });
-    } catch (e) {
-      this.handleError(e, 'getGlobalPublications');
-      return [];
-    }
-  }
-
-  async addPublication(pub: Publication): Promise<void> {
-    try {
-      const pubRef = doc(db_fs, 'publications', pub.id);
-      await setDoc(pubRef, {
-        ...pub,
-        timestamp: Timestamp.now()
-      });
-    } catch (e) {
-      this.handleError(e, 'addPublication');
-    }
-  }
-
-  async updatePublication(updatedPub: Publication): Promise<void> {
-    try {
-      const pubRef = doc(db_fs, 'publications', updatedPub.id);
-      await updateDoc(pubRef, {
-        likes: updatedPub.likes,
-        dislikes: updatedPub.dislikes,
-        comments: updatedPub.comments
-      });
-    } catch (e) {
-      this.handleError(e, 'updatePublication');
+      return { success: false, message: "حدث خطأ في معالجة الطلب." };
     }
   }
 
   subscribeToFeed(callback: (pubs: Publication[]) => void) {
-    try {
-      const q = query(collection(db_fs, 'publications'), orderBy('timestamp', 'desc'), limit(50));
-      return onSnapshot(q, (snap) => {
-        const pubs = snap.docs.map(d => {
-          const data = d.data();
-          return {
-            ...data,
-            timestamp: data.timestamp?.toDate() || new Date()
-          } as Publication;
-        });
-        callback(pubs);
-      }, (error) => {
-        this.handleError(error, 'subscribeToFeed');
-      });
-    } catch (e) {
-      this.handleError(e, 'subscribeToFeedInit');
-      return () => {};
+    const q = query(collection(db_fs, 'publications'), orderBy('timestamp', 'desc'), limit(50));
+    return onSnapshot(q, (snap) => {
+      const pubs = snap.docs.map(d => ({ ...d.data(), timestamp: d.data().timestamp?.toDate() || new Date() } as Publication));
+      callback(pubs);
+    }, (error) => {
+      this.handleError(error, 'subscribeToFeed');
+      callback([]);
+    });
+  }
+
+  async addPublication(pub: Publication): Promise<void> {
+    const pubRef = doc(db_fs, 'publications', pub.id);
+    await setDoc(pubRef, { ...pub, timestamp: Timestamp.now() });
+  }
+
+  async updatePublication(updatedPub: Publication): Promise<void> {
+    const pubRef = doc(db_fs, 'publications', updatedPub.id);
+    await updateDoc(pubRef, { likes: updatedPub.likes, dislikes: updatedPub.dislikes, comments: updatedPub.comments });
+  }
+
+  async toggleUserStatus(email: string): Promise<void> {
+    const user = await this.getUser(email);
+    if (user) {
+      const userRef = doc(db_fs, 'users', email.toLowerCase());
+      await updateDoc(userRef, { status: user.status === 'banned' ? 'active' : 'banned' });
     }
   }
 
-  async getAds(): Promise<AdConfig[]> {
-    try {
-      const snap = await getDocs(collection(db_fs, 'ads'));
-      return snap.docs.map(d => d.data() as AdConfig);
-    } catch (e) {
-      this.handleError(e, 'getAds');
-      return [];
-    }
-  }
-
-  async updateAdConfig(ad: AdConfig): Promise<void> {
-    try {
-      await setDoc(doc(db_fs, 'ads', ad.id), ad, { merge: true });
-    } catch (e) {
-      this.handleError(e, 'updateAdConfig');
-    }
-  }
-
-  async deleteAd(id: string): Promise<void> {
-    try {
-      await deleteDoc(doc(db_fs, 'ads', id));
-    } catch (e) {
-      this.handleError(e, 'deleteAd');
-    }
+  async deleteUser(email: string): Promise<void> {
+    await deleteDoc(doc(db_fs, 'users', email.toLowerCase()));
   }
 
   async getAllWithdrawals(): Promise<any[]> {
-    try {
-      const users = await this.getAllUsers();
-      let all: any[] = [];
-      users.forEach(u => {
-        if (u.withdrawals) {
-          all = [...all, ...u.withdrawals.map(w => ({ ...w, userEmail: u.email, userName: u.name }))];
-        }
-      });
-      return all.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-    } catch (e) {
-      this.handleError(e, 'getAllWithdrawals');
-      return [];
-    }
-  }
-
-  async resetAllWallets(): Promise<void> {
-    try {
-      const users = await this.getAllUsers();
-      for (const u of users) {
-        await updateDoc(doc(db_fs, 'users', u.email.toLowerCase()), {
-          diamonds: 0,
-          usd_balance: 0,
-          withdrawals: []
-        });
+    const users = await this.getAllUsers();
+    let all: any[] = [];
+    users.forEach(u => {
+      if (u.withdrawals) {
+        all = [...all, ...u.withdrawals.map(w => ({ ...w, userEmail: u.email, userName: u.name }))];
       }
-      await setDoc(doc(db_fs, 'platform', 'stats'), { revenue: 0, totalPayouts: 0 });
-    } catch (e) {
-      this.handleError(e, 'resetAllWallets');
-    }
+    });
+    return all.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }
 }
 

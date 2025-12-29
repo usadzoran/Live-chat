@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { useTranslation } from '../contexts/LanguageContext';
 
 interface AuthPageProps {
   onLogin: (name: string, email: string, password?: string) => void;
@@ -13,119 +14,144 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBack }) => {
     email: '',
     password: ''
   });
+  const { t, isRTL } = useTranslation();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate auth logic, passing credentials up to App
     onLogin(formData.name || formData.email.split('@')[0], formData.email, formData.password);
   };
 
   const isAdminPortal = window.location.hash === '#/admin-portal';
 
   return (
-    <div className="h-screen w-full flex items-center justify-center bg-zinc-950 p-4 relative overflow-hidden">
-      {/* Background Glows */}
-      <div className={`absolute top-1/4 -left-20 w-96 h-96 ${isAdminPortal ? 'bg-cyan-600/10' : 'bg-pink-600/10'} blur-[120px] rounded-full`}></div>
-      <div className={`absolute bottom-1/4 -right-20 w-96 h-96 ${isAdminPortal ? 'bg-indigo-600/10' : 'bg-purple-600/10'} blur-[120px] rounded-full`}></div>
+    <div className="min-h-screen w-full flex items-center justify-center bg-zinc-950 p-4 relative overflow-hidden">
+      {/* Immersive Background Decorations */}
+      <div className={`absolute top-[-20%] left-[-10%] w-[60%] h-[60%] ${isAdminPortal ? 'bg-cyan-600/20' : 'bg-pink-600/20'} blur-[180px] rounded-full animate-pulse`}></div>
+      <div className={`absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] ${isAdminPortal ? 'bg-indigo-600/20' : 'bg-purple-600/20'} blur-[180px] rounded-full animate-pulse`} style={{ animationDelay: '3s' }}></div>
+      
+      {/* Floating Geometric Elements for Depth */}
+      <div className="absolute top-[15%] right-[10%] w-32 h-32 border border-white/5 rounded-[3rem] rotate-12 animate-float hidden lg:block opacity-40"></div>
+      <div className="absolute bottom-[15%] left-[10%] w-40 h-40 border border-white/5 rounded-[4rem] -rotate-12 animate-float hidden lg:block opacity-40" style={{ animationDelay: '4s' }}></div>
 
       {onBack && (
         <button 
           onClick={onBack}
-          className="absolute top-8 left-8 flex items-center gap-2 text-zinc-500 hover:text-white transition-colors text-xs font-bold uppercase tracking-widest z-50"
+          className={`absolute top-8 ${isRTL ? 'right-8' : 'left-8'} flex items-center gap-3 text-zinc-500 hover:text-white transition-all text-[11px] font-black uppercase tracking-[0.3em] z-50 group`}
         >
-          <i className="fa-solid fa-arrow-left"></i>
-          Back to home
+          <i className={`fa-solid ${isRTL ? 'fa-arrow-right' : 'fa-arrow-left'} group-hover:${isRTL ? 'translate-x-1' : '-translate-x-1'} transition-transform`}></i>
+          {isRTL ? 'العودة للرئيسية' : 'Back to home'}
         </button>
       )}
 
-      <div className="w-full max-w-md glass-panel p-8 rounded-[2.5rem] relative z-10 shadow-2xl border-white/5 animate-in fade-in zoom-in duration-500">
-        <div className="flex flex-col items-center gap-2 mb-8">
-          <div className={`w-16 h-16 rounded-3xl ${isAdminPortal ? 'bg-cyan-600' : 'stream-gradient'} flex items-center justify-center shadow-2xl ${isAdminPortal ? 'shadow-cyan-500/30' : 'shadow-pink-500/30'} mb-4`}>
-            <i className={`fa-solid ${isAdminPortal ? 'fa-shield-halved' : 'fa-face-grin-stars'} text-white text-3xl`}></i>
-          </div>
-          <h1 className="text-3xl font-black tracking-tighter text-white">
-            {isAdminPortal ? 'System Master' : (isLogin ? 'Member Login' : 'Join Elite Circle')}
-          </h1>
-          <p className="text-zinc-500 text-sm text-center">
-            {isAdminPortal 
-              ? 'Authorized Personnel Only' 
-              : (isLogin ? 'Connect with your favorite Dolls or Mentors' : 'Sign up as a Mentor or a Doll today')}
-          </p>
+      <div className="w-full max-w-[460px] relative z-10 flex flex-col items-center">
+        {/* Decorative Top Logo Area */}
+        <div className="mb-12 text-center animate-in fade-in slide-in-from-top-12 duration-1000">
+           <div className={`w-24 h-24 rounded-[2.5rem] mx-auto ${isAdminPortal ? 'bg-cyan-600 shadow-cyan-600/40' : 'stream-gradient shadow-pink-600/40'} flex items-center justify-center shadow-2xl mb-8 relative group overflow-hidden`}>
+              <i className={`fa-solid ${isAdminPortal ? 'fa-shield-halved' : 'fa-face-grin-stars'} text-white text-5xl relative z-10 transition-transform group-hover:scale-110 duration-500`}></i>
+              <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-500"></div>
+           </div>
+           <h1 className="text-5xl font-black tracking-tighter text-white mb-3 italic">
+             {isAdminPortal ? 'System Node' : (isLogin ? (isRTL ? 'تسجيل الدخول' : 'Access Club') : (isRTL ? 'انضم للنخبة' : 'Elite Entry'))}
+           </h1>
+           <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.25em] opacity-80">
+             {isAdminPortal 
+               ? 'Secure Administrative Access' 
+               : (isLogin ? (isRTL ? 'تواصل مع الدمى والمدربين المفضلين لديك' : 'The destination for refined connections') : (isRTL ? 'سجل كمدرب أو دمية اليوم' : 'Enter the world of high-end companionship'))}
+           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {!isLogin && !isAdminPortal && (
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Nickname</label>
-              <div className="relative">
-                <i className="fa-solid fa-user absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 text-sm"></i>
+        {/* Form Container */}
+        <div className="w-full glass-panel p-10 lg:p-12 rounded-[4rem] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.6)] border-white/10 animate-in fade-in zoom-in duration-700 relative overflow-hidden group/card">
+          {/* Internal card glow */}
+          <div className="absolute -top-24 -right-24 w-48 h-48 bg-white/5 blur-3xl rounded-full opacity-0 group-hover/card:opacity-100 transition-opacity duration-1000"></div>
+          
+          <form onSubmit={handleSubmit} className="space-y-6 relative z-10">
+            {!isLogin && !isAdminPortal && (
+              <div className="space-y-2 animate-in slide-in-from-left-4 duration-500">
+                <label className={`text-[10px] font-black text-zinc-500 uppercase tracking-widest ${isRTL ? 'mr-2' : 'ml-2'}`}>
+                  {isRTL ? 'اللقب' : 'Identity Name'}
+                </label>
+                <div className="relative group/input">
+                  <i className={`fa-solid fa-user absolute ${isRTL ? 'right-6' : 'left-6'} top-1/2 -translate-y-1/2 text-zinc-600 text-sm group-focus-within/input:text-pink-500 transition-colors`}></i>
+                  <input
+                    required
+                    type="text"
+                    placeholder={isRTL ? 'مثلاً: VIP_Mentor' : 'e.g. VIP_Persona'}
+                    className={`w-full bg-black/50 border border-white/5 rounded-3xl py-5 ${isRTL ? 'pr-16 pl-6' : 'pl-16 pr-6'} text-sm text-white placeholder:text-zinc-700 focus:outline-none focus:border-pink-500/50 focus:ring-4 focus:ring-pink-500/5 transition-all shadow-inner`}
+                    value={formData.name}
+                    onChange={e => setFormData({ ...formData, name: e.target.value })}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <label className={`text-[10px] font-black text-zinc-500 uppercase tracking-widest ${isRTL ? 'mr-2' : 'ml-2'}`}>
+                {isRTL ? 'البريد أو المعرف' : 'Credential / Email'}
+              </label>
+              <div className="relative group/input">
+                <i className={`fa-solid fa-envelope absolute ${isRTL ? 'right-6' : 'left-6'} top-1/2 -translate-y-1/2 text-zinc-600 text-sm group-focus-within/input:text-pink-500 transition-colors`}></i>
                 <input
                   required
                   type="text"
-                  placeholder="e.g. VIP_Mentor"
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 pl-12 pr-4 text-sm text-white focus:outline-none focus:border-pink-500/50 transition-colors"
-                  value={formData.name}
-                  onChange={e => setFormData({ ...formData, name: e.target.value })}
+                  placeholder={isAdminPortal ? "Auth Key" : (isRTL ? "البريد الإلكتروني" : "vault@mydoll.club")}
+                  className={`w-full bg-black/50 border border-white/5 rounded-3xl py-5 ${isRTL ? 'pr-16 pl-6' : 'pl-16 pr-6'} text-sm text-white placeholder:text-zinc-700 focus:outline-none focus:border-pink-500/50 focus:ring-4 focus:ring-pink-500/5 transition-all shadow-inner`}
+                  value={formData.email}
+                  onChange={e => setFormData({ ...formData, email: e.target.value })}
                 />
               </div>
             </div>
-          )}
 
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Username or Email</label>
-            <div className="relative">
-              <i className="fa-solid fa-envelope absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 text-sm"></i>
-              <input
-                required
-                type="text"
-                placeholder={isAdminPortal ? "Admin Username" : "vip@mydoll.club"}
-                className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 pl-12 pr-4 text-sm text-white focus:outline-none focus:border-pink-500/50 transition-colors"
-                value={formData.email}
-                onChange={e => setFormData({ ...formData, email: e.target.value })}
-              />
+            <div className="space-y-2">
+              <label className={`text-[10px] font-black text-zinc-500 uppercase tracking-widest ${isRTL ? 'mr-2' : 'ml-2'}`}>
+                {isRTL ? 'كلمة المرور' : 'Security Pin'}
+              </label>
+              <div className="relative group/input">
+                <i className={`fa-solid fa-lock absolute ${isRTL ? 'right-6' : 'left-6'} top-1/2 -translate-y-1/2 text-zinc-600 text-sm group-focus-within/input:text-pink-500 transition-colors`}></i>
+                <input
+                  required
+                  type="password"
+                  placeholder="••••••••"
+                  className={`w-full bg-black/50 border border-white/5 rounded-3xl py-5 ${isRTL ? 'pr-16 pl-6' : 'pl-16 pr-6'} text-sm text-white placeholder:text-zinc-700 focus:outline-none focus:border-pink-500/50 focus:ring-4 focus:ring-pink-500/5 transition-all shadow-inner`}
+                  value={formData.password}
+                  onChange={e => setFormData({ ...formData, password: e.target.value })}
+                />
+              </div>
             </div>
-          </div>
 
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Password</label>
-            <div className="relative">
-              <i className="fa-solid fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 text-sm"></i>
-              <input
-                required
-                type="password"
-                placeholder="••••••••"
-                className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 pl-12 pr-4 text-sm text-white focus:outline-none focus:border-pink-500/50 transition-colors"
-                value={formData.password}
-                onChange={e => setFormData({ ...formData, password: e.target.value })}
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            className={`w-full py-4 mt-4 rounded-2xl ${isAdminPortal ? 'bg-cyan-600 hover:bg-cyan-500 shadow-cyan-600/20' : 'bg-pink-600 hover:bg-pink-500 shadow-pink-600/20'} text-white font-black text-xs tracking-widest transition-all active:scale-[0.98] shadow-2xl`}
-          >
-            {isAdminPortal ? 'INITIALIZE MASTER NODE' : (isLogin ? 'ACCESS CLUB' : 'START JOURNEY')}
-          </button>
-        </form>
-
-        <div className="mt-8 flex items-center gap-4">
-          <div className="h-[1px] flex-1 bg-zinc-800"></div>
-          <span className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest">secure identity</span>
-          <div className="h-[1px] flex-1 bg-zinc-800"></div>
-        </div>
-
-        {!isAdminPortal && (
-          <p className="mt-8 text-center text-xs text-zinc-500">
-            {isLogin ? "New to the elite circle?" : "Already a member?"}
             <button
-              onClick={() => setIsLogin(!isLogin)}
-              className="ml-2 text-pink-400 font-bold hover:underline"
+              type="submit"
+              className={`w-full py-6 mt-6 rounded-3xl ${isAdminPortal ? 'bg-cyan-600 hover:bg-cyan-500 shadow-cyan-600/30' : 'bg-pink-600 hover:bg-pink-500 shadow-pink-600/30'} text-white font-black text-[11px] uppercase tracking-[0.35em] transition-all active:scale-[0.98] shadow-2xl relative overflow-hidden group/btn`}
             >
-              {isLogin ? 'Join My Doll' : 'Sign in'}
+              <span className="relative z-10">{isAdminPortal ? 'UNLOCK SYSTEM NODE' : (isLogin ? (isRTL ? 'دخول النادي' : 'INITIALIZE ACCESS') : (isRTL ? 'ابدأ الرحلة' : 'CREATE ACCOUNT'))}</span>
+              <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover/btn:translate-x-0 transition-transform duration-700 skew-x-[-20deg]"></div>
             </button>
-          </p>
-        )}
+          </form>
+
+          <div className="mt-10 flex items-center gap-6">
+            <div className="h-[1px] flex-1 bg-white/5"></div>
+            <span className="text-[8px] text-zinc-700 font-black uppercase tracking-[0.4em] whitespace-nowrap">{isRTL ? 'هوية آمنة' : 'exclusive encryption'}</span>
+            <div className="h-[1px] flex-1 bg-white/5"></div>
+          </div>
+
+          {!isAdminPortal && (
+            <p className="mt-10 text-center text-[11px] font-bold text-zinc-500 uppercase tracking-widest">
+              {isLogin ? (isRTL ? "جديد في النادي؟" : "Not yet enrolled?") : (isRTL ? "بالفعل عضو؟" : "Part of the circle?") }
+              <button
+                onClick={() => setIsLogin(!isLogin)}
+                className={`ml-2 ${isAdminPortal ? 'text-cyan-400' : 'text-pink-500'} font-black hover:text-white transition-colors underline underline-offset-8`}
+              >
+                {isLogin ? (isRTL ? 'انضم إلينا' : 'Apply Now') : (isRTL ? 'تسجيل الدخول' : 'Secure Sign-in')}
+              </button>
+            </p>
+          )}
+        </div>
+        
+        {/* Footer Badge */}
+        <div className="mt-16 flex items-center gap-4 opacity-30 hover:opacity-100 transition-opacity duration-700 group">
+           <i className="fa-solid fa-crown text-zinc-500 group-hover:text-yellow-500 transition-colors"></i>
+           <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.5em]">The Gold Standard In Virtual Companionship</span>
+        </div>
       </div>
     </div>
   );

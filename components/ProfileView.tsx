@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useMemo } from 'react';
 import { ViewType, WithdrawalRecord } from '../types';
-import { db, UserDB, AlbumPhoto, MIN_WITHDRAW_USD, GEMS_PER_DOLLAR } from '../services/databaseService';
+import { db, UserDB, MIN_WITHDRAW_GEMS, GEMS_PER_DOLLAR } from '../services/databaseService';
 
 interface ProfileViewProps {
   user: UserDB;
@@ -28,9 +28,9 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
   
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [showAlbumModal, setShowAlbumModal] = useState(false);
-  const [editingPhoto, setEditingPhoto] = useState<AlbumPhoto | null>(null);
+  const [editingPhoto, setEditingPhoto] = useState<any | null>(null);
   
-  const [withdrawData, setWithdrawData] = useState({ email: user.email, gems: 2000 });
+  const [withdrawData, setWithdrawData] = useState({ email: user.email, gems: MIN_WITHDRAW_GEMS });
   const [photoForm, setPhotoForm] = useState({ url: '', price: 0, caption: '' });
   const [isProcessing, setIsProcessing] = useState(false);
   const [toast, setToast] = useState<{msg: string, type: 'success' | 'error'} | null>(null);
@@ -51,92 +51,9 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
     setTimeout(() => setIsCopying(false), 2000);
   };
 
-  const handleShare = (platform: 'whatsapp' | 'telegram' | 'twitter') => {
-    const text = `Hey! Join me at My Doll, the elite social club. Use my invitation to get a starter bonus: ${referralLink}`;
-    const urls = {
-      whatsapp: `https://wa.me/?text=${encodeURIComponent(text)}`,
-      telegram: `https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(text)}`,
-      twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`
-    };
-    window.open(urls[platform], '_blank');
-  };
-
-  const filteredAlbum = useMemo(() => {
-    if (galleryFilter === 'free') return formData.album.filter(p => p.price <= 0);
-    if (galleryFilter === 'premium') return formData.album.filter(p => p.price > 0);
-    return formData.album;
-  }, [formData.album, galleryFilter]);
-
-  const handleSaveProfile = async () => {
-    const updated = await db.upsertUser(formData);
-    onUpdate(updated);
-    setIsEditing(false);
-    showToast("Profile Updated", "success");
-  };
-
   const showToast = (msg: string, type: 'success' | 'error') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, target: 'avatar' | 'cover' | 'album') => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = reader.result as string;
-      if (target === 'avatar') {
-        setFormData({ ...formData, avatar: result });
-      } else if (target === 'cover') {
-        setFormData({ ...formData, cover: result });
-      } else if (target === 'album') {
-        setEditingPhoto(null);
-        setPhotoForm({ url: result, price: 0, caption: '' });
-        setShowAlbumModal(true);
-      }
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleSavePhoto = () => {
-    let updatedAlbum: AlbumPhoto[];
-    if (editingPhoto) {
-      updatedAlbum = formData.album.map(p => 
-        p.id === editingPhoto.id ? { ...p, price: photoForm.price, caption: photoForm.caption } : p
-      );
-    } else {
-      const newPhoto: AlbumPhoto = {
-        id: `photo_${Date.now()}`,
-        url: photoForm.url,
-        price: photoForm.price,
-        caption: photoForm.caption
-      };
-      updatedAlbum = [...formData.album, newPhoto];
-    }
-
-    const newFormData = { ...formData, album: updatedAlbum };
-    setFormData(newFormData);
-    db.upsertUser(newFormData);
-    setShowAlbumModal(false);
-    setPhotoForm({ url: '', price: 0, caption: '' });
-    setEditingPhoto(null);
-    showToast(editingPhoto ? "Photo updated" : "Photo added", "success");
-  };
-
-  const handleDeletePhoto = (id: string) => {
-    if (!confirm("Are you sure you want to delete this photo?")) return;
-    const updatedAlbum = formData.album.filter(p => p.id !== id);
-    const newFormData = { ...formData, album: updatedAlbum };
-    setFormData(newFormData);
-    db.upsertUser(newFormData);
-    showToast("Photo removed", "success");
-  };
-
-  const openEditPhoto = (photo: AlbumPhoto) => {
-    setEditingPhoto(photo);
-    setPhotoForm({ url: photo.url, price: photo.price, caption: photo.caption || '' });
-    setShowAlbumModal(true);
   };
 
   const handleWithdraw = async () => {
@@ -155,7 +72,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
   };
 
   const currentUsdValue = user.diamonds / GEMS_PER_DOLLAR;
-  const canWithdraw = currentUsdValue >= MIN_WITHDRAW_USD;
+  const canWithdraw = user.diamonds >= MIN_WITHDRAW_GEMS;
 
   return (
     <div className="max-w-6xl mx-auto h-full flex flex-col gap-4 overflow-y-auto pb-24 lg:pb-32 hide-scrollbar px-1 relative">
@@ -163,13 +80,6 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
       {/* Hero Section */}
       <div className="relative h-48 md:h-72 lg:h-80 rounded-[2rem] lg:rounded-[3rem] overflow-hidden shrink-0 shadow-2xl border border-white/5 group bg-zinc-900">
         <img src={formData.cover} className="w-full h-full object-cover" alt="cover" />
-        {isEditing && (
-          <div onClick={() => coverInputRef.current?.click()} className="absolute inset-0 bg-black/40 backdrop-blur-sm flex flex-col items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity">
-            <i className="fa-solid fa-camera text-4xl mb-2 text-white"></i>
-            <span className="text-[10px] font-black uppercase tracking-widest text-white">Change Banner</span>
-            <input type="file" ref={coverInputRef} hidden accept="image/*" onChange={(e) => handleFileChange(e, 'cover')} />
-          </div>
-        )}
         <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent"></div>
         <button onClick={onBack} className="absolute top-6 left-6 w-10 h-10 rounded-2xl bg-black/40 backdrop-blur-md flex items-center justify-center text-white border border-white/10 hover:bg-white/10 z-20"><i className="fa-solid fa-arrow-left text-xs"></i></button>
         <div className="absolute top-6 right-6 px-4 py-2 bg-zinc-950/40 backdrop-blur-xl border border-white/10 rounded-2xl flex items-center gap-2">
@@ -183,45 +93,16 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
         <div className="relative shrink-0 group">
           <div className="w-32 h-32 md:w-36 md:h-36 lg:w-44 lg:h-44 rounded-[2.5rem] lg:rounded-[3rem] overflow-hidden border-4 md:border-8 border-zinc-950 shadow-2xl bg-zinc-900">
             <img src={formData.avatar} className="w-full h-full object-cover" alt="avatar" />
-            {isEditing && (
-              <div onClick={() => avatarInputRef.current?.click()} className="absolute inset-0 bg-black/40 backdrop-blur-sm flex flex-col items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity">
-                <i className="fa-solid fa-camera text-2xl text-white"></i>
-                <input type="file" ref={avatarInputRef} hidden accept="image/*" onChange={(e) => handleFileChange(e, 'avatar')} />
-              </div>
-            )}
           </div>
         </div>
         <div className="flex-1 text-center md:text-left">
           <div className="flex flex-col md:flex-row md:items-center gap-2 mb-2">
-            {isEditing ? (
-              <input 
-                type="text" 
-                className="bg-white/5 border border-white/10 rounded-xl px-4 py-1 text-2xl font-black text-white focus:outline-none focus:border-pink-500/50"
-                value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
-              />
-            ) : (
-              <h1 className="text-3xl lg:text-5xl font-black text-white tracking-tight">{formData.name}</h1>
-            )}
-            <button onClick={() => isEditing ? handleSaveProfile() : setIsEditing(true)} className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${isEditing ? 'bg-green-600 text-white shadow-lg' : 'bg-white/5 text-zinc-400 hover:text-white'}`}>
-              {isEditing ? 'Save Changes' : 'Edit Profile'}
+            <h1 className="text-3xl lg:text-5xl font-black text-white tracking-tight">{formData.name}</h1>
+            <button onClick={() => setIsEditing(!isEditing)} className="px-4 py-1.5 bg-white/5 rounded-xl text-[9px] font-black uppercase tracking-widest text-zinc-400 hover:text-white transition-all">
+              {isEditing ? 'Cancel' : 'Edit Profile'}
             </button>
           </div>
-          <div className="flex flex-wrap items-center gap-3 justify-center md:justify-start">
-            <p className="text-zinc-500 text-xs italic">{formData.bio || 'Elite Member of My Doll Circle'}</p>
-            {formData.gender && (
-              <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded-md text-zinc-400 font-bold uppercase tracking-widest border border-white/5 flex items-center gap-1.5">
-                <i className={`fa-solid ${formData.gender === 'men' ? 'fa-mars text-blue-400' : formData.gender === 'women' ? 'fa-venus text-pink-400' : 'fa-genderless text-zinc-400'}`}></i>
-                {formData.gender}
-              </span>
-            )}
-            {formData.country && (
-              <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded-md text-zinc-400 font-bold uppercase tracking-widest border border-white/5 flex items-center gap-1.5">
-                <i className="fa-solid fa-earth-americas text-cyan-400"></i>
-                {formData.country}
-              </span>
-            )}
-          </div>
+          <p className="text-zinc-500 text-xs italic">{formData.bio || 'Elite Member of My Doll Circle'}</p>
         </div>
       </div>
 
@@ -236,71 +117,6 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
 
       {/* Content Area */}
       <div className="px-4 lg:px-12 pb-10 mt-6">
-        {activeTab === 'showcase' && (
-          <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <h3 className="text-xs font-black text-white uppercase tracking-widest">My Gallery</h3>
-                <div className="flex bg-zinc-900 rounded-lg p-1 border border-white/5">
-                  {['all', 'free', 'premium'].map(f => (
-                    <button 
-                      key={f}
-                      onClick={() => setGalleryFilter(f as any)}
-                      className={`px-3 py-1.5 rounded-md text-[8px] font-black uppercase tracking-widest transition-all ${galleryFilter === f ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
-                    >
-                      {f}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <button 
-                onClick={() => albumInputRef.current?.click()}
-                className="px-4 py-2 bg-pink-600/10 border border-pink-500/20 text-pink-500 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-pink-600 hover:text-white transition-all"
-              >
-                <i className="fa-solid fa-plus mr-2"></i> Add Photo
-                <input type="file" ref={albumInputRef} hidden accept="image/*" onChange={(e) => handleFileChange(e, 'album')} />
-              </button>
-            </div>
-
-            {filteredAlbum.length > 0 ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {filteredAlbum.map((photo) => (
-                  <div key={photo.id} className="group relative aspect-[3/4] rounded-2xl overflow-hidden border border-white/5 shadow-xl bg-zinc-900">
-                    <div className={`w-full h-full transition-all duration-500 ${photo.price > 0 ? 'blur-md group-hover:blur-[2px]' : ''}`}>
-                      <img src={photo.url} className="w-full h-full object-cover transition-transform group-hover:scale-110 duration-700" alt={photo.caption} />
-                    </div>
-                    
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-4">
-                      {photo.caption && <p className="text-[10px] text-white font-bold mb-1 truncate">{photo.caption}</p>}
-                      <div className="flex items-center justify-between">
-                        <span className={`text-[9px] font-black uppercase ${photo.price > 0 ? 'text-pink-500' : 'text-emerald-400'}`}>
-                          {photo.price > 0 ? `${photo.price} Gems` : 'Free'}
-                        </span>
-                        <div className="flex gap-2">
-                           <button onClick={() => openEditPhoto(photo)} className="w-8 h-8 rounded-lg bg-white/10 hover:bg-indigo-600 flex items-center justify-center text-white transition-all"><i className="fa-solid fa-pen text-[8px]"></i></button>
-                           <button onClick={() => handleDeletePhoto(photo.id)} className="w-8 h-8 rounded-lg bg-white/10 hover:bg-red-600 flex items-center justify-center text-white transition-all"><i className="fa-solid fa-trash text-[8px]"></i></button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {photo.price > 0 && (
-                      <div className="absolute top-2 right-2 px-2 py-1 bg-zinc-950/80 backdrop-blur-md rounded-lg border border-white/10 flex items-center gap-1.5 z-10">
-                         <i className="fa-solid fa-lock text-[8px] text-pink-500"></i>
-                         <span className="text-[9px] font-black text-white">{photo.price}</span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-20 opacity-30 border-2 border-dashed border-white/10 rounded-[3rem]">
-                <i className="fa-solid fa-images text-4xl mb-4"></i>
-                <p className="text-xs uppercase font-black tracking-widest">No matching photos</p>
-              </div>
-            )}
-          </div>
-        )}
-
         {activeTab === 'wallet' && (
           <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -323,13 +139,13 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
                     <button 
                       onClick={() => setShowWithdrawModal(true)} 
                       disabled={!canWithdraw}
-                      className="w-full py-4 bg-emerald-600 text-white font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-xl shadow-emerald-600/20 active:scale-95 transition-all disabled:opacity-50 disabled:grayscale"
+                      className={`w-full py-4 font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-xl transition-all ${canWithdraw ? 'bg-emerald-600 text-white shadow-emerald-600/20 active:scale-95' : 'bg-zinc-800 text-zinc-600 cursor-not-allowed'}`}
                     >
-                      Withdraw Cash
+                      {canWithdraw ? 'Withdraw Cash' : 'Insufficient Balance'}
                     </button>
                     {!canWithdraw && (
                        <p className="text-[9px] text-amber-500 font-bold uppercase tracking-widest text-center">
-                          Need ${(MIN_WITHDRAW_USD - currentUsdValue).toFixed(2)} more to reach $20 minimum.
+                          الحد الأدنى للسحب هو 2000 جوهرة ($20). يتبقى لك {(MIN_WITHDRAW_GEMS - user.diamonds).toLocaleString()} جوهرة.
                        </p>
                     )}
                  </div>
@@ -346,7 +162,6 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
                      <tr className="border-b border-white/5 text-zinc-600">
                        <th className="p-6">Date</th>
                        <th className="p-6">Amount</th>
-                       <th className="p-6">Method</th>
                        <th className="p-6">Status</th>
                      </tr>
                    </thead>
@@ -355,13 +170,12 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
                        <tr key={i} className="border-b border-white/5 text-zinc-300">
                          <td className="p-6">{new Date(w.timestamp).toLocaleDateString()}</td>
                          <td className="p-6 text-emerald-400">${w.amountUsd.toFixed(2)}</td>
-                         <td className="p-6">{w.paypalEmail}</td>
                          <td className="p-6">
                             <span className="px-2 py-1 rounded bg-emerald-500/10 text-emerald-500">{w.status}</span>
                          </td>
                        </tr>
                      )) : (
-                       <tr><td colSpan={4} className="p-12 text-center text-zinc-700">No transactions recorded</td></tr>
+                       <tr><td colSpan={3} className="p-12 text-center text-zinc-700">No transactions recorded</td></tr>
                      )}
                    </tbody>
                  </table>
@@ -369,200 +183,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
             </div>
           </div>
         )}
-
-        {activeTab === 'settings' && (
-          <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-             
-             {/* Referral Program Section */}
-             <div className="glass-panel p-8 rounded-[3rem] border-white/10 space-y-6 shadow-2xl relative overflow-hidden bg-gradient-to-br from-pink-600/10 via-transparent to-indigo-600/10">
-                <div className="flex items-center gap-4 border-b border-white/5 pb-4">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-400 to-yellow-600 flex items-center justify-center shadow-lg">
-                    <i className="fa-solid fa-crown text-white"></i>
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-black text-white uppercase tracking-tighter">Elite Invitations</h2>
-                    <p className="text-[8px] text-zinc-500 uppercase font-black tracking-widest">Invite Friends • Earn Gems</p>
-                  </div>
-                </div>
-
-                <div className="space-y-6">
-                   <div className="p-6 bg-black/40 border border-white/5 rounded-2xl space-y-4">
-                      <p className="text-xs text-zinc-400 leading-relaxed font-bold italic">
-                        Share your unique elite link. For every friend who joins the circle, you receive <span className="text-pink-500">50 Gems</span>.
-                      </p>
-                      
-                      <div className="relative group">
-                        <input 
-                          type="text" 
-                          readOnly
-                          value={referralLink}
-                          className="w-full bg-zinc-950 border border-white/10 rounded-xl py-4 pl-4 pr-32 text-[10px] text-zinc-500 font-mono focus:outline-none"
-                        />
-                        <button 
-                          onClick={handleCopyLink}
-                          className={`absolute right-2 top-2 bottom-2 px-6 rounded-lg font-black text-[9px] uppercase tracking-widest transition-all ${isCopying ? 'bg-green-600 text-white' : 'bg-pink-600 text-white hover:bg-pink-500'}`}
-                        >
-                          {isCopying ? 'Copied!' : 'Copy Link'}
-                        </button>
-                      </div>
-
-                      <div className="flex items-center justify-between gap-4 pt-2">
-                        <div className="flex gap-3">
-                           <button onClick={() => handleShare('whatsapp')} className="w-10 h-10 rounded-xl bg-green-600/10 text-green-500 flex items-center justify-center hover:bg-green-600 hover:text-white transition-all"><i className="fa-brands fa-whatsapp"></i></button>
-                           <button onClick={() => handleShare('telegram')} className="w-10 h-10 rounded-xl bg-blue-600/10 text-blue-400 flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all"><i className="fa-brands fa-telegram"></i></button>
-                           <button onClick={() => handleShare('twitter')} className="w-10 h-10 rounded-xl bg-white/5 text-zinc-400 flex items-center justify-center hover:bg-white hover:text-black transition-all"><i className="fa-brands fa-x-twitter"></i></button>
-                        </div>
-                        <div className="text-right">
-                           <p className="text-[8px] text-zinc-600 uppercase font-black tracking-widest">Successful Invites</p>
-                           <p className="text-lg font-black text-white">{formData.referralCount}</p>
-                        </div>
-                      </div>
-                   </div>
-                </div>
-             </div>
-
-             <div className="glass-panel p-8 rounded-[3rem] border-white/10 space-y-8 shadow-2xl">
-                <div className="flex items-center gap-4 border-b border-white/5 pb-4">
-                  <div className="w-10 h-10 rounded-xl bg-pink-600/10 flex items-center justify-center">
-                    <i className="fa-solid fa-user-gear text-pink-500"></i>
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-black text-white uppercase tracking-tighter">Profile Settings</h2>
-                    <p className="text-[8px] text-zinc-500 uppercase font-black tracking-widest">Identity & Preferences</p>
-                  </div>
-                </div>
-
-                <div className="space-y-6">
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Full Display Name</label>
-                        <input 
-                          type="text" 
-                          value={formData.name}
-                          onChange={(e) => setFormData({...formData, name: e.target.value})}
-                          placeholder="Elite Name"
-                          className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 px-6 text-xs text-white focus:outline-none focus:border-pink-500/50 transition-all"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Date of Birth</label>
-                        <input 
-                          type="date" 
-                          value={formData.dob}
-                          onChange={(e) => setFormData({...formData, dob: e.target.value})}
-                          className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 px-6 text-xs text-white focus:outline-none focus:border-pink-500/50 transition-all"
-                        />
-                      </div>
-                   </div>
-
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Gender</label>
-                        <div className="relative group">
-                          <select 
-                            value={formData.gender}
-                            onChange={(e) => setFormData({...formData, gender: e.target.value as any})}
-                            className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 px-6 text-xs text-white focus:outline-none focus:border-pink-500/50 transition-all appearance-none cursor-pointer"
-                          >
-                            <option value="women">Women</option>
-                            <option value="men">Men</option>
-                            <option value="other">Other</option>
-                          </select>
-                          <i className="fa-solid fa-chevron-down absolute right-6 top-1/2 -translate-y-1/2 text-zinc-600 pointer-events-none group-focus-within:rotate-180 transition-transform"></i>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Country</label>
-                        <div className="relative">
-                          <i className="fa-solid fa-globe absolute left-6 top-1/2 -translate-y-1/2 text-zinc-600 text-xs"></i>
-                          <input 
-                            type="text" 
-                            value={formData.country}
-                            onChange={(e) => setFormData({...formData, country: e.target.value})}
-                            placeholder="e.g. Monaco"
-                            className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 pl-12 pr-6 text-xs text-white focus:outline-none focus:border-pink-500/50 transition-all"
-                          />
-                        </div>
-                      </div>
-                   </div>
-
-                   <div className="space-y-2">
-                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">About Me (Bio)</label>
-                      <textarea 
-                        value={formData.bio}
-                        onChange={(e) => setFormData({...formData, bio: e.target.value})}
-                        placeholder="Share your lifestyle and interests..."
-                        className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 px-6 text-xs text-white focus:outline-none focus:border-pink-500/50 transition-all h-32 resize-none"
-                      />
-                   </div>
-                </div>
-
-                <div className="pt-4">
-                  <button 
-                    onClick={handleSaveProfile}
-                    className="w-full py-5 bg-pink-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-2xl shadow-pink-600/40 active:scale-95 transition-all flex items-center justify-center gap-3"
-                  >
-                    <i className="fa-solid fa-cloud-arrow-up"></i>
-                    Sync Profile Details
-                  </button>
-                </div>
-             </div>
-          </div>
-        )}
       </div>
-
-      {/* Album Modal (Add/Edit) */}
-      {showAlbumModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-zinc-950/90 backdrop-blur-xl animate-in fade-in duration-300">
-           <div className="w-full max-w-md glass-panel p-8 rounded-[3rem] border-white/10 shadow-2xl space-y-6 relative overflow-hidden">
-              <button onClick={() => setShowAlbumModal(false)} className="absolute top-6 right-6 text-zinc-600 hover:text-white"><i className="fa-solid fa-xmark text-lg"></i></button>
-              
-              <div className="text-center space-y-2">
-                 <h3 className="text-2xl font-black text-white uppercase tracking-tighter">
-                   {editingPhoto ? 'Edit Photo' : 'Add to Gallery'}
-                 </h3>
-                 <p className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">
-                   {photoForm.price > 0 ? 'Premium Content' : 'Free Content'}
-                 </p>
-              </div>
-
-              <div className={`aspect-[4/5] rounded-2xl overflow-hidden border border-white/5 bg-zinc-900 ${photoForm.price > 0 ? 'blur-sm' : ''}`}>
-                <img src={photoForm.url} className="w-full h-full object-cover" alt="preview" />
-              </div>
-
-              <div className="space-y-4">
-                 <div className="space-y-1">
-                    <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Caption</label>
-                    <input 
-                      type="text" 
-                      value={photoForm.caption}
-                      onChange={(e) => setPhotoForm({...photoForm, caption: e.target.value})}
-                      placeholder="Summer vibes..."
-                      className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 px-6 text-xs text-white focus:outline-none focus:border-pink-500/50" 
-                    />
-                 </div>
-                 <div className="space-y-1">
-                    <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Price (Gems)</label>
-                    <input 
-                      type="number" 
-                      value={photoForm.price}
-                      onChange={(e) => setPhotoForm({...photoForm, price: parseInt(e.target.value) || 0})}
-                      placeholder="0 for free"
-                      className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 px-6 text-xs text-white focus:outline-none focus:border-pink-500/50" 
-                    />
-                    <p className="text-[8px] text-zinc-500 font-bold uppercase mt-1">Set a price to make this a premium photo</p>
-                 </div>
-              </div>
-
-              <button 
-                onClick={handleSavePhoto}
-                className="w-full py-5 bg-pink-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-2xl active:scale-95"
-              >
-                {editingPhoto ? 'SAVE CHANGES' : 'UPLOAD TO COLLECTION'}
-              </button>
-           </div>
-        </div>
-      )}
 
       {/* Withdrawal Modal */}
       {showWithdrawModal && (
@@ -573,7 +194,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
               <div className="text-center space-y-2">
                  <div className="w-16 h-16 rounded-full bg-emerald-600/20 flex items-center justify-center text-3xl text-emerald-400 mx-auto border border-emerald-500/20"><i className="fa-solid fa-vault"></i></div>
                  <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Convert to Cash</h3>
-                 <p className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">100 Gems = $1.00 USD | Min $20.00</p>
+                 <p className="text-[9px] text-zinc-500 font-black uppercase tracking-widest">100 Gems = $1.00 USD | Min 2,000 Gems</p>
               </div>
 
               <div className="space-y-4">
@@ -590,7 +211,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
                     <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Gems to Convert</label>
                     <input 
                       type="number" 
-                      min={MIN_WITHDRAW_USD * GEMS_PER_DOLLAR}
+                      min={MIN_WITHDRAW_GEMS}
                       value={withdrawData.gems}
                       onChange={(e) => setWithdrawData({...withdrawData, gems: parseInt(e.target.value) || 0})}
                       className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 px-6 text-xs text-white focus:outline-none focus:border-emerald-500/50" 
@@ -604,7 +225,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
 
               <button 
                 onClick={handleWithdraw}
-                disabled={isProcessing || withdrawData.gems < (MIN_WITHDRAW_USD * GEMS_PER_DOLLAR) || withdrawData.gems > user.diamonds}
+                disabled={isProcessing || withdrawData.gems < MIN_WITHDRAW_GEMS || withdrawData.gems > user.diamonds}
                 className="w-full py-5 bg-emerald-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-2xl active:scale-95 disabled:opacity-50"
               >
                 {isProcessing ? <i className="fa-solid fa-circle-notch animate-spin"></i> : 'CONFIRM WITHDRAWAL'}
