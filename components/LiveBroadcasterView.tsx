@@ -5,30 +5,55 @@ import ChatPanel from './ChatPanel';
 import ControlBar from './ControlBar';
 import { StreamStatus, ChatMessage, Gift } from '../types';
 import { GeminiLiveService } from '../services/geminiLiveService';
+// Import UserDB from databaseService instead of types to fix the compilation error
+import { db, UserDB } from '../services/databaseService';
 
-const LiveBroadcasterView: React.FC = () => {
+interface LiveBroadcasterViewProps {
+  user?: UserDB;
+}
+
+const LiveBroadcasterView: React.FC<LiveBroadcasterViewProps> = ({ user }) => {
   const [status, setStatus] = useState<StreamStatus>(StreamStatus.IDLE);
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [isCamOff, setIsCamOff] = useState(false);
   const [title, setTitle] = useState("Exclusive VIP Session");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [coins, setCoins] = useState(25000);
+  const [coins, setCoins] = useState(user?.diamonds || 0);
   
   const [service] = useState(() => new GeminiLiveService());
 
   useEffect(() => {
     return () => {
       service.disconnect();
+      if (user) db.endLiveSession(user.uid);
     };
-  }, [service]);
+  }, [service, user]);
 
   const handleStart = async () => {
     setStatus(StreamStatus.CONNECTING);
     try {
       await service.connect({
-        onOpen: () => setStatus(StreamStatus.LIVE),
-        onClose: () => setStatus(StreamStatus.IDLE),
-        onError: () => setStatus(StreamStatus.IDLE),
+        onOpen: async () => {
+          setStatus(StreamStatus.LIVE);
+          if (user) {
+            await db.startLiveSession({
+              uid: user.uid,
+              userName: user.name,
+              userAvatar: user.avatar || '',
+              title,
+              viewerCount: 0,
+              startedAt: Date.now()
+            });
+          }
+        },
+        onClose: () => {
+          setStatus(StreamStatus.IDLE);
+          if (user) db.endLiveSession(user.uid);
+        },
+        onError: () => {
+          setStatus(StreamStatus.IDLE);
+          if (user) db.endLiveSession(user.uid);
+        },
         onTranscription: (sender, text) => {
           setMessages(prev => [...prev, {
             id: Math.random().toString(),
@@ -47,6 +72,7 @@ const LiveBroadcasterView: React.FC = () => {
   const handleStop = () => {
     service.disconnect();
     setStatus(StreamStatus.IDLE);
+    if (user) db.endLiveSession(user.uid);
   };
 
   const handleSendGift = (gift: Gift) => {
@@ -66,7 +92,6 @@ const LiveBroadcasterView: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col lg:flex-row gap-4 lg:gap-6 max-w-[1800px] mx-auto overflow-hidden">
-      {/* Primary Video & Controls Section */}
       <div className="flex-1 lg:flex-[2] flex flex-col gap-4 lg:gap-6 h-full overflow-hidden min-h-0">
         <div className="flex-1 min-h-0">
           <StreamView 
@@ -77,7 +102,6 @@ const LiveBroadcasterView: React.FC = () => {
           />
         </div>
         
-        {/* Responsive Control Bar */}
         <div className="shrink-0 pb-1 lg:pb-0">
           <ControlBar 
             status={status}
@@ -97,7 +121,6 @@ const LiveBroadcasterView: React.FC = () => {
         </div>
       </div>
 
-      {/* Responsive Chat Panel Section */}
       <div className="flex-1 lg:flex-none lg:w-[400px] xl:w-[450px] min-h-[300px] lg:h-full overflow-hidden">
         <ChatPanel 
           messages={messages} 

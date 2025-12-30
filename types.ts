@@ -16,7 +16,7 @@ export interface AdConfig {
 
 export interface ChatMessage {
   id: string;
-  sender: 'user' | 'gemini';
+  sender: 'user' | 'gemini' | 'system';
   text: string;
   timestamp: Date;
   isGift?: boolean;
@@ -93,10 +93,11 @@ export interface Publication {
   timestamp: Date;
 }
 
-export interface AdminStats {
-  totalRevenue: number;
-  activeDolls: number;
-  activeMentors: number;
-  serverStatus: 'optimal' | 'degraded' | 'critical';
-  aiLatency: number;
+export interface LiveStreamSession {
+  uid: string;
+  userName: string;
+  userAvatar: string;
+  title: string;
+  viewerCount: number;
+  startedAt: number;
 }

@@ -87,11 +87,6 @@ const StreamView: React.FC<StreamViewProps> = ({ status, isCamOff, title, onTitl
             <div className="w-32 h-32 lg:w-44 lg:h-44 rounded-[3.5rem] bg-zinc-900/60 flex items-center justify-center border border-white/10 shadow-inner relative z-10">
               <i className={`fa-solid ${isIdle ? 'fa-clapperboard' : 'fa-video-slash'} text-5xl lg:text-7xl text-zinc-800`}></i>
             </div>
-            {isLive && isCamOff && (
-              <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-red-600 rounded-lg text-[9px] font-black uppercase tracking-widest text-white shadow-xl whitespace-nowrap">
-                Privacy Active
-              </div>
-            )}
           </div>
           <p className="text-xl lg:text-3xl font-black text-white uppercase tracking-tighter mb-1">{isIdle ? 'Ready to Go Live' : 'Camera Feed Paused'}</p>
           <p className="text-[10px] text-zinc-600 font-black uppercase tracking-[0.4em]">{isIdle ? 'Configure your session below' : 'Viewers see your avatar'}</p>
@@ -107,7 +102,7 @@ const StreamView: React.FC<StreamViewProps> = ({ status, isCamOff, title, onTitl
             </div>
             <div className="px-5 py-2.5 bg-black/40 backdrop-blur-3xl rounded-2xl border border-white/10 shadow-2xl">
               <p className="text-[9px] font-black text-pink-500 uppercase tracking-widest mb-0.5">Primary Node</p>
-              <p className="text-sm font-black text-white">System Master</p>
+              <p className="text-sm font-black text-white">System Broadcaster</p>
             </div>
           </div>
           

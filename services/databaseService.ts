@@ -21,11 +21,10 @@ import {
   serverTimestamp,
   Firestore
 } from 'firebase/firestore';
-import { getDatabase, Database } from 'firebase/database';
+import { getDatabase, ref, set, onValue, remove, Database, push, onDisconnect } from 'firebase/database';
 import { getAuth, signInAnonymously, signOut, Auth } from 'firebase/auth';
-import { WithdrawalRecord, Publication, ViewType, Comment } from '../types';
+import { WithdrawalRecord, Publication, ViewType, Comment, LiveStreamSession } from '../types';
 
-// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyAKnoCa3sKwZrQaUXy0PNkJ1FbsJGAOyjk",
   authDomain: "studio-3236344976-c8013.firebaseapp.com",
@@ -78,10 +77,7 @@ class DatabaseService {
     try {
       const snap = await getDoc(doc(db_fs, 'users', uid));
       return snap.exists() ? snap.data() as UserDB : null;
-    } catch (e) { 
-      console.error("Error getting user:", e);
-      return null; 
-    }
+    } catch (e) { return null; }
   }
 
   async getAllUsers(): Promise<UserDB[]> {
@@ -149,54 +145,48 @@ class DatabaseService {
     };
   }
 
-  async clearAllData(): Promise<{ success: boolean; message: string }> {
-    try {
-      const collections = ['users', 'publications', 'transactions'];
-      for (const colName of collections) {
-        const snap = await getDocs(collection(db_fs, colName));
-        const batch = writeBatch(db_fs);
-        snap.docs.forEach(d => batch.delete(d.ref));
-        await batch.commit();
-      }
-      return { success: true, message: "Cloud Wipe Complete." };
-    } catch (e: any) { return { success: false, message: e.message }; }
-  }
-
-  async toggleUserStatus(uid: string): Promise<void> {
-    try {
-      const user = await this.getUser(uid);
-      if (!user) return;
-      await updateDoc(doc(db_fs, 'users', uid), { status: user.status === 'banned' ? 'active' : 'banned' });
-    } catch (e) {}
-  }
-
-  async capturePaypalOrder(orderID: string, uid: string, amount: number, price: number): Promise<{ success: boolean; message: string }> {
-    try {
-      const transRef = doc(db_fs, 'transactions', orderID);
-      await setDoc(transRef, { orderID, userUid: uid, gems: amount, price, status: 'COMPLETED', timestamp: Timestamp.now() });
-      await updateDoc(doc(db_fs, 'users', uid), { diamonds: increment(amount) });
-      return { success: true, message: "Order Captured." };
-    } catch (e: any) { return { success: false, message: e.message }; }
-  }
-
-  // --- Real-time Feed Operations ---
+  // --- Real-time Presence & Streaming ---
   
-  subscribeToFeed(callback: (pubs: Publication[]) => void) {
-    if (!db_fs) return () => {};
+  async startLiveSession(session: LiveStreamSession) {
+    const streamRef = ref(database, `active_streams/${session.uid}`);
+    await set(streamRef, {
+      ...session,
+      startedAt: Date.now()
+    });
+    onDisconnect(streamRef).remove();
+  }
 
+  async endLiveSession(uid: string) {
+    const streamRef = ref(database, `active_streams/${uid}`);
+    await remove(streamRef);
+  }
+
+  subscribeToActiveStreams(callback: (streams: LiveStreamSession[]) => void) {
+    const streamsRef = ref(database, 'active_streams');
+    return onValue(streamsRef, (snapshot) => {
+      const data = snapshot.val();
+      if (!data) {
+        callback([]);
+        return;
+      }
+      const streams = Object.values(data) as LiveStreamSession[];
+      callback(streams);
+    });
+  }
+
+  // --- Firestore Social Operations ---
+
+  subscribeToFeed(callback: (pubs: Publication[]) => void) {
     const q = query(collection(db_fs, 'publications'), orderBy('timestamp', 'desc'), limit(50));
-    
     return onSnapshot(q, { includeMetadataChanges: true }, (snap) => {
       const pubs = snap.docs.map(d => {
         const data = d.data();
         let finalTimestamp: Date;
-
         if (data.timestamp && typeof data.timestamp.toDate === 'function') {
           finalTimestamp = data.timestamp.toDate();
         } else {
-          finalTimestamp = new Date(); // Latency compensation fallback
+          finalTimestamp = new Date();
         }
-
         return { 
           ...data, 
           id: d.id,
@@ -209,27 +199,22 @@ class DatabaseService {
   }
 
   async addPublication(pub: Omit<Publication, 'id' | 'timestamp'>): Promise<void> {
-    try {
-      const pubRef = doc(collection(db_fs, 'publications'));
-      // Using serverTimestamp for server-side accuracy
-      await setDoc(pubRef, { 
-        ...pub, 
-        id: pubRef.id, 
-        timestamp: serverTimestamp(), 
-        likes: 0, 
-        dislikes: 0, 
-        comments: [] 
-      });
-    } catch (err) {
-      console.error("Cloud synchronization failed:", err);
-      throw err;
-    }
+    const pubRef = doc(collection(db_fs, 'publications'));
+    await setDoc(pubRef, { 
+      ...pub, 
+      id: pubRef.id, 
+      timestamp: serverTimestamp(), 
+      likes: 0, 
+      dislikes: 0, 
+      comments: [] 
+    });
   }
 
   async likePublication(pubId: string) {
     try { await updateDoc(doc(db_fs, 'publications', pubId), { likes: increment(1) }); } catch (e) {}
   }
 
+  // Added dislikePublication method to resolve missing method error in FeedPage.tsx
   async dislikePublication(pubId: string) {
     try { await updateDoc(doc(db_fs, 'publications', pubId), { dislikes: increment(1) }); } catch (e) {}
   }
@@ -242,17 +227,45 @@ class DatabaseService {
     } catch (e) {}
   }
 
-  async getAllWithdrawals(): Promise<any[]> {
+  async capturePaypalOrder(orderID: string, uid: string, amount: number, price: number): Promise<{ success: boolean; message: string }> {
     try {
-      const users = await this.getAllUsers();
-      const withdrawals: any[] = [];
-      users.forEach(u => (u.withdrawals || []).forEach(w => withdrawals.push({ ...w, userName: u.name, userEmail: u.email })));
-      return withdrawals.sort((a, b) => {
-        const tA = a.timestamp instanceof Timestamp ? a.timestamp.toMillis() : new Date(a.timestamp).getTime();
-        const tB = b.timestamp instanceof Timestamp ? b.timestamp.toMillis() : new Date(b.timestamp).getTime();
-        return tB - tA;
-      });
-    } catch (e) { return []; }
+      const transRef = doc(db_fs, 'transactions', orderID);
+      await setDoc(transRef, { orderID, userUid: uid, gems: amount, price, status: 'COMPLETED', timestamp: Timestamp.now() });
+      await updateDoc(doc(db_fs, 'users', uid), { diamonds: increment(amount) });
+      return { success: true, message: "Order Captured." };
+    } catch (e: any) { return { success: false, message: e.message }; }
+  }
+
+  async clearAllData(): Promise<{ success: boolean; message: string }> {
+    try {
+      const collections = ['users', 'publications', 'transactions'];
+      for (const colName of collections) {
+        const snap = await getDocs(collection(db_fs, colName));
+        const batch = writeBatch(db_fs);
+        snap.docs.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+      }
+      const streamsRef = ref(database, 'active_streams');
+      await remove(streamsRef);
+      return { success: true, message: "Cloud Wipe Complete." };
+    } catch (e: any) { return { success: false, message: e.message }; }
+  }
+
+  async toggleUserStatus(uid: string): Promise<void> {
+    const user = await this.getUser(uid);
+    if (!user) return;
+    await updateDoc(doc(db_fs, 'users', uid), { status: user.status === 'banned' ? 'active' : 'banned' });
+  }
+
+  async getAllWithdrawals(): Promise<any[]> {
+    const users = await this.getAllUsers();
+    const withdrawals: any[] = [];
+    users.forEach(u => (u.withdrawals || []).forEach(w => withdrawals.push({ ...w, userName: u.name, userEmail: u.email })));
+    return withdrawals.sort((a, b) => {
+      const tA = a.timestamp instanceof Timestamp ? a.timestamp.toMillis() : new Date(a.timestamp).getTime();
+      const tB = b.timestamp instanceof Timestamp ? b.timestamp.toMillis() : new Date(b.timestamp).getTime();
+      return tB - tA;
+    });
   }
 }
 

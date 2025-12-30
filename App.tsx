@@ -25,48 +25,30 @@ const AppContent: React.FC = () => {
   const [isInitializing, setIsInitializing] = useState(true);
   const [platformRevenue, setPlatformRevenue] = useState<number>(0);
 
-  // Persistence: Direct real-time cloud session monitoring
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // User exists in cloud session. Fetch profile from Firestore using UID
         const u = await db.getUser(firebaseUser.uid);
-        
         if (u) {
           setUser(u);
           setIsAuthenticated(true);
           setIsAdmin(u.role === 'admin' || u.email === 'admin@mydoll.club');
-          
-          if (u.lastActiveView) {
-            setCurrentView(u.lastActiveView);
-          }
-          
-          if (window.location.hash === '#/admin-portal' && (u.role === 'admin' || u.email === 'admin@mydoll.club')) {
-            setCurrentView('admin');
-          }
+          if (u.lastActiveView) setCurrentView(u.lastActiveView);
         } else {
-          // Firebase Auth session exists but no Firestore profile yet (rare case)
           setIsAuthenticated(false);
         }
       } else {
-        // No session found
         setIsAuthenticated(false);
         setUser(null);
         setIsAdmin(false);
       }
-
-      // Pre-fetch revenue for dashboard if admin
       const rev = await db.getPlatformRevenue();
       setPlatformRevenue(rev);
-      
-      // Delay to ensure UI transition is smooth
       setTimeout(() => setIsInitializing(false), 1500);
     });
-
     return () => unsubscribe();
   }, []);
 
-  // Sync Current View to Database on change for cloud-only persistence
   useEffect(() => {
     if (isAuthenticated && user) {
       db.updateViewPreference(user.uid, currentView);
@@ -78,7 +60,6 @@ const AppContent: React.FC = () => {
       (email === 'wahabfresh' || name === 'wahabfresh' || email === 'admin@mydoll.club') && 
       password === 'vampirewahab31';
     
-    // Auth anonymously for simple session, but document is stored by UID
     const cred = await signInAnonymously(auth);
     const uid = cred.user.uid;
     
@@ -111,7 +92,6 @@ const AppContent: React.FC = () => {
     setIsAdmin(false);
     setUser(null);
     setCurrentView('feed');
-    window.location.hash = '';
   };
 
   if (isInitializing) {
@@ -121,9 +101,8 @@ const AppContent: React.FC = () => {
           <div className="w-24 h-24 rounded-[2.5rem] stream-gradient animate-pulse flex items-center justify-center shadow-[0_0_80px_rgba(244,114,182,0.4)]">
             <i className="fa-solid fa-face-grin-stars text-white text-4xl animate-bounce"></i>
           </div>
-          <div className="absolute inset-0 border-2 border-white/10 rounded-[2.8rem] scale-125 animate-spin duration-[4s]"></div>
         </div>
-        <div className="text-center animate-in fade-in zoom-in duration-1000">
+        <div className="text-center animate-in fade-in duration-1000">
           <h2 className="text-white font-black tracking-[0.6em] uppercase text-[10px] mb-2">My Doll Club</h2>
           <p className="text-zinc-800 text-[8px] font-black uppercase tracking-[0.8em]">Secure Cloud Protocol Active</p>
         </div>
@@ -144,7 +123,7 @@ const AppContent: React.FC = () => {
           {currentView === 'feed' && <FeedPage user={user!} />}
           {currentView === 'messages' && <MessagesView currentUser={user!} />}
           {currentView === 'discovery' && <DiscoveryView />}
-          {currentView === 'live' && <LiveBroadcasterView />}
+          {currentView === 'live' && <LiveBroadcasterView user={user!} />}
           {currentView === 'admin' && <AdminDashboard totalRevenue={platformRevenue} />}
           {currentView === 'store' && <StoreView user={user!} onPurchaseSuccess={() => db.getUser(user!.uid).then(setUser)} onBack={() => setCurrentView('feed')} />}
         </div>
