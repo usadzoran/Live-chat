@@ -1,11 +1,12 @@
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Publication, Comment, AdConfig } from '../types';
+import React, { useState, useRef, useEffect } from 'react';
+import { Publication, Comment } from '../types';
 import { GoogleGenAI } from '@google/genai';
 import { db } from '../services/databaseService';
+import { useTranslation } from '../contexts/LanguageContext';
 
 interface FeedPageProps {
-  user: { name: string; avatar?: string; email?: string };
+  user: { name: string; avatar?: string; email: string };
 }
 
 const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
@@ -14,121 +15,30 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
   const [selectedType, setSelectedType] = useState<'text' | 'image' | 'video'>('text');
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  
-  // Pull to Refresh & Sync State
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [pullDistance, setPullDistance] = useState(0);
   const [showNewPostsToast, setShowNewPostsToast] = useState(false);
+  const { t, isRTL } = useTranslation();
   
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const startY = useRef(0);
-  const isPulling = useRef(false);
 
-  const PULL_THRESHOLD = 80;
-
-  // Real-time Firestore Subscription
+  // Real-time Firestore Subscription for ALL registered users
   useEffect(() => {
-    let isMounted = true;
     const unsubscribe = db.subscribeToFeed((newPubs) => {
-      if (!isMounted) return;
-      setError(null); // Clear errors if we get data
-      setPublications(prev => {
-        if (newPubs.length > prev.length && prev.length > 0) {
-          if (containerRef.current && containerRef.current.scrollTop > 100) {
-            setShowNewPostsToast(true);
-            return prev;
-          }
-        }
-        return newPubs;
-      });
+      setError(null);
+      setPublications(newPubs);
     });
-
-    // Check connection state after a delay
-    const timeout = setTimeout(() => {
-      if (publications.length === 0 && isMounted) {
-        // This might be a permission error or slow network
-        console.warn("Feed remains empty. Check Firebase Rules if this persists.");
-      }
-    }, 5000);
-
-    return () => {
-      isMounted = false;
-      unsubscribe();
-      clearTimeout(timeout);
-    };
+    return () => unsubscribe();
   }, []);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (containerRef.current?.scrollTop === 0) {
-      startY.current = e.touches[0].pageY;
-      isPulling.current = true;
-    }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isPulling.current) return;
-    const currentY = e.touches[0].pageY;
-    const diff = currentY - startY.current;
-    
-    if (diff > 0) {
-      const dampedDiff = Math.min(diff * 0.4, 120);
-      setPullDistance(dampedDiff);
-      if (diff > 10 && e.cancelable) e.preventDefault();
-    }
-  };
-
-  const handleTouchEnd = () => {
-    if (pullDistance >= PULL_THRESHOLD) {
-      triggerRefresh();
-    }
-    isPulling.current = false;
-    setPullDistance(0);
-  };
-
-  const triggerRefresh = async () => {
-    if (isRefreshing) return;
-    setIsRefreshing(true);
-    setError(null);
-    
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: 'Generate a very short luxury post for an elite club. Return JSON: { "username": "string", "content": "string", "type": "text" }',
-        config: { responseMimeType: 'application/json' }
-      });
-
-      const data = JSON.parse(response.text || '{}');
-      const newUpdate: Publication = {
-        id: Math.random().toString(36).substr(2, 9),
-        user: data.username || 'VIP_Guest',
-        userAvatar: `https://ui-avatars.com/api/?name=${data.username || 'Elite'}&background=random&color=fff`,
-        type: 'text',
-        content: data.content,
-        likes: 0,
-        dislikes: 0,
-        comments: [],
-        timestamp: new Date()
-      };
-
-      await db.addPublication(newUpdate);
-    } catch (error) {
-      console.error("Manual refresh sync error", error);
-      setError("Sync failed. Check connection or project rules.");
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
 
   const handlePost = async () => {
     if (selectedType === 'text' && !newPostText.trim()) return;
     if (selectedType !== 'text' && !mediaUrl) return;
 
     const newPub: Publication = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: '', // Will be set by Firebase
       user: user.name,
-      userAvatar: user.avatar || `https://ui-avatars.com/api/?name=${user.name}&background=6366f1&color=fff`,
+      userAvatar: user.avatar || `https://ui-avatars.com/api/?name=${user.name}&background=f472b6&color=fff`,
       type: selectedType,
       content: selectedType === 'text' ? newPostText : mediaUrl!,
       description: selectedType !== 'text' ? newPostText : undefined,
@@ -148,13 +58,11 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
   const handleInteraction = async (pubId: string, action: 'like' | 'dislike') => {
     const pub = publications.find(p => p.id === pubId);
     if (!pub) return;
-
     const updated = { 
       ...pub, 
       likes: action === 'like' ? pub.likes + 1 : pub.likes, 
       dislikes: action === 'dislike' ? pub.dislikes + 1 : pub.dislikes 
     };
-    
     await db.updatePublication(updated);
   };
 
@@ -162,14 +70,12 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
     if (!text.trim()) return;
     const pub = publications.find(p => p.id === pubId);
     if (!pub) return;
-
     const newComment: Comment = { 
       id: Math.random().toString(36).substr(2, 9), 
       user: user.name, 
       text, 
       timestamp: new Date() 
     };
-    
     const updated = { ...pub, comments: [...pub.comments, newComment] };
     await db.updatePublication(updated);
   };
@@ -177,92 +83,52 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
   return (
     <div className="relative h-full w-full overflow-hidden bg-zinc-950">
       <div 
-        className="absolute top-0 left-0 right-0 flex items-center justify-center pointer-events-none transition-opacity"
-        style={{ height: pullDistance, opacity: pullDistance / PULL_THRESHOLD }}
-      >
-        <div className={`flex flex-col items-center gap-2 transition-all ${pullDistance >= PULL_THRESHOLD ? 'scale-110' : 'scale-100'}`}>
-           <div className={`w-10 h-10 rounded-full bg-zinc-900 border flex items-center justify-center shadow-xl transition-colors ${pullDistance >= PULL_THRESHOLD ? 'border-pink-500 text-pink-500' : 'border-white/10 text-zinc-500'}`}>
-              {isRefreshing ? (
-                <i className="fa-solid fa-circle-notch animate-spin"></i>
-              ) : (
-                <i className="fa-solid fa-gem" style={{ transform: `rotate(${pullDistance * 4}deg)` }}></i>
-              )}
-           </div>
-           <span className="text-[8px] font-black uppercase tracking-[0.2em] text-zinc-600">
-             {isRefreshing ? 'Syncing...' : (pullDistance >= PULL_THRESHOLD ? 'Release to Refresh' : 'Pull to Sync')}
-           </span>
-        </div>
-      </div>
-
-      <div 
         ref={containerRef} 
-        onTouchStart={handleTouchStart} 
-        onTouchMove={handleTouchMove} 
-        onTouchEnd={handleTouchEnd}
-        className="h-full w-full overflow-y-auto pb-32 hide-scrollbar px-2 lg:px-4"
-        style={{ 
-          transform: `translateY(${pullDistance}px)`, 
-          transition: isPulling.current ? 'none' : 'transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)' 
-        }}
+        className="h-full w-full overflow-y-auto pb-32 hide-scrollbar px-3 lg:px-6"
       >
-        {showNewPostsToast && (
-          <div 
-            onClick={() => { window.location.reload(); }} 
-            className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 bg-pink-600 rounded-full shadow-2xl shadow-pink-600/40 text-[10px] font-black uppercase tracking-[0.2em] text-white cursor-pointer border border-white/20 animate-in fade-in slide-in-from-top-4 duration-500"
-          >
-            <i className="fa-solid fa-cloud-arrow-down mr-2"></i>
-            Load New Updates
-          </div>
-        )}
-
-        <div className="max-w-3xl mx-auto space-y-6 pt-4">
-          <div className="flex items-center justify-between px-4">
+        <div className="max-w-3xl mx-auto space-y-6 pt-6">
+          <div className={`flex items-center justify-between px-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
             <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter flex items-center gap-3">
-              Elite Feed
+              {isRTL ? 'خلاصة النخبة' : 'Elite Feed'}
               <div className="flex gap-1 items-center">
-                 <div className={`w-1.5 h-1.5 rounded-full ${error ? 'bg-red-500' : 'bg-pink-500 animate-pulse'}`}></div>
-                 <span className={`text-[8px] ${error ? 'text-red-500' : 'text-pink-500'} not-italic tracking-widest uppercase`}>
-                   {error ? 'Sync Error' : 'Cloud Sync Active'}
-                 </span>
+                 <div className="w-2 h-2 rounded-full bg-pink-500 animate-pulse shadow-[0_0_10px_rgba(236,72,153,0.8)]"></div>
+                 <span className="text-[9px] text-pink-500 font-black tracking-widest uppercase">Live Cloud</span>
               </div>
             </h2>
           </div>
 
-          {error && (
-            <div className="mx-4 p-3 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center gap-3 text-red-400">
-               <i className="fa-solid fa-circle-exclamation text-xs"></i>
-               <p className="text-[10px] font-black uppercase tracking-widest leading-none">{error}</p>
-            </div>
-          )}
-
-          <div className="glass-panel p-6 lg:p-8 rounded-[2.5rem] border-white/5 shadow-2xl bg-gradient-to-br from-zinc-900/50 to-transparent">
-            <div className="flex gap-4 mb-4">
-              <img src={user.avatar || `https://ui-avatars.com/api/?name=${user.name}&background=6366f1&color=fff`} className="w-12 h-12 rounded-2xl shadow-lg" alt="avatar" />
+          {/* Create Post Section */}
+          <div className="glass-panel p-6 lg:p-10 rounded-[2.5rem] border-white/5 shadow-2xl bg-gradient-to-br from-zinc-900/40 to-transparent">
+            <div className={`flex gap-4 mb-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
+              <img src={user.avatar || `https://ui-avatars.com/api/?name=${user.name}&background=f472b6&color=fff`} className="w-14 h-14 rounded-2xl shadow-xl border border-white/5" alt="avatar" />
               <textarea
-                className="flex-1 bg-black/40 border border-white/10 rounded-2xl p-4 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-pink-500/50 resize-none transition-all"
-                placeholder="Share with the club..." rows={2} value={newPostText} onChange={(e) => setNewPostText(e.target.value)}
+                className={`flex-1 bg-black/40 border border-white/10 rounded-2xl p-5 text-sm text-white placeholder:text-zinc-700 focus:outline-none focus:border-pink-500/40 resize-none transition-all shadow-inner ${isRTL ? 'text-right' : 'text-left'}`}
+                placeholder={isRTL ? 'شارك شيئاً مع النادي...' : 'Share with the club...'} 
+                rows={2} 
+                value={newPostText} 
+                onChange={(e) => setNewPostText(e.target.value)}
               />
             </div>
 
             {mediaUrl && (
-              <div className="mb-4 relative rounded-2xl overflow-hidden border border-white/10 aspect-video bg-black/40 shadow-inner group">
+              <div className="mb-4 relative rounded-3xl overflow-hidden border border-white/10 aspect-video bg-black/60 shadow-inner">
                  {selectedType === 'image' ? (
                    <img src={mediaUrl} className="w-full h-full object-cover" alt="Preview" />
                  ) : (
                    <video src={mediaUrl} className="w-full h-full object-cover" autoPlay muted loop />
                  )}
-                 <button onClick={() => setMediaUrl(null)} className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-red-600 transition-all backdrop-blur-md border border-white/10">
+                 <button onClick={() => setMediaUrl(null)} className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-red-600 transition-all backdrop-blur-md">
                    <i className="fa-solid fa-xmark"></i>
                  </button>
               </div>
             )}
 
-            <div className="flex flex-wrap items-center justify-between gap-4 border-t border-white/5 pt-6">
-              <div className="flex gap-3">
+            <div className={`flex flex-wrap items-center justify-between gap-4 border-t border-white/5 pt-6 ${isRTL ? 'flex-row-reverse' : ''}`}>
+              <div className={`flex gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
                 {[
-                  { id: 'text', icon: 'fa-font', label: 'Text' },
-                  { id: 'image', icon: 'fa-image', label: 'Photo' },
-                  { id: 'video', icon: 'fa-clapperboard', label: 'Short' }
+                  { id: 'text', icon: 'fa-font', label: isRTL ? 'نص' : 'Text' },
+                  { id: 'image', icon: 'fa-image', label: isRTL ? 'صورة' : 'Photo' },
+                  { id: 'video', icon: 'fa-clapperboard', label: isRTL ? 'فيديو' : 'Short' }
                 ].map((type) => (
                   <button 
                     key={type.id} 
@@ -270,7 +136,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
                       setSelectedType(type.id as any);
                       if (type.id !== 'text') fileInputRef.current?.click();
                     }} 
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${selectedType === type.id ? 'bg-pink-600 text-white shadow-xl shadow-pink-600/20' : 'bg-white/5 text-zinc-500 hover:bg-white/10 border border-white/5'}`}
+                    className={`flex items-center gap-2 px-5 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${selectedType === type.id ? 'bg-pink-600 text-white shadow-xl shadow-pink-600/30' : 'bg-white/5 text-zinc-500 hover:bg-white/10 border border-white/5'}`}
                   >
                     <i className={`fa-solid ${type.icon}`}></i> {type.label}
                   </button>
@@ -284,19 +150,28 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
                   }
                 }} />
               </div>
-              <button onClick={handlePost} className="px-10 py-3 bg-pink-600 hover:bg-pink-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-2xl shadow-pink-600/30 active:scale-95">PUBLISH</button>
+              <button 
+                onClick={handlePost} 
+                className="px-12 py-3.5 bg-pink-600 hover:bg-pink-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-2xl shadow-pink-600/40 active:scale-95 group relative overflow-hidden"
+              >
+                <span className="relative z-10">{isRTL ? 'نـشر' : 'PUBLISH'}</span>
+                <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-500 skew-x-[-20deg]"></div>
+              </button>
             </div>
           </div>
 
+          {/* Publications List */}
           <div className="space-y-8 pb-10">
             {publications.map((pub) => (
-              <PublicationCard key={pub.id} pub={pub} onInteraction={handleInteraction} onComment={addComment} />
+              <PublicationCard key={pub.id} pub={pub} onInteraction={handleInteraction} onComment={addComment} isRTL={isRTL} />
             ))}
             {publications.length === 0 && (
-              <div className="py-20 flex flex-col items-center justify-center opacity-20 text-center space-y-4">
-                 <i className={`fa-solid ${error ? 'fa-triangle-exclamation text-red-500' : 'fa-cloud text-pink-500'} text-5xl`}></i>
-                 <p className="text-xs font-black uppercase tracking-widest">
-                   {error ? 'Waiting for database authorization...' : 'Awaiting cloud stream...'}
+              <div className="py-24 flex flex-col items-center justify-center opacity-30 text-center space-y-5">
+                 <div className="w-20 h-20 rounded-full border-2 border-dashed border-zinc-800 flex items-center justify-center">
+                   <i className="fa-solid fa-cloud text-pink-500 text-3xl animate-pulse"></i>
+                 </div>
+                 <p className="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-600">
+                   {isRTL ? 'بانتظار وصول البيانات السحابية...' : 'Awaiting Global Cloud Stream...'}
                  </p>
               </div>
             )}
@@ -311,97 +186,106 @@ interface PublicationCardProps {
   pub: Publication;
   onInteraction: (id: string, action: 'like' | 'dislike') => void;
   onComment: (id: string, text: string) => void;
+  isRTL: boolean;
 }
 
-const PublicationCard: React.FC<PublicationCardProps> = ({ pub, onInteraction, onComment }) => {
+const PublicationCard: React.FC<PublicationCardProps> = ({ pub, onInteraction, onComment, isRTL }) => {
   const [commentText, setCommentText] = useState('');
   const [showComments, setShowComments] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
 
   return (
-    <div className="glass-panel rounded-[2.5rem] border-white/5 overflow-hidden animate-in fade-in slide-in-from-bottom-6 duration-700 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.5)] bg-zinc-900/30 backdrop-blur-sm">
-      <div className="p-6 lg:p-8">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
+    <div className="glass-panel rounded-[2.5rem] border-white/5 overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-700 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.6)] bg-zinc-900/30 backdrop-blur-xl group">
+      <div className="p-8 lg:p-10">
+        <div className={`flex items-center justify-between mb-8 ${isRTL ? 'flex-row-reverse' : ''}`}>
+          <div className={`flex items-center gap-5 ${isRTL ? 'flex-row-reverse' : ''}`}>
             <div className="relative">
-              <img src={pub.userAvatar} className="w-11 h-11 rounded-2xl object-cover shadow-lg" alt="avatar" />
-              <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-emerald-500 border-2 border-zinc-900 rounded-full"></div>
+              <img src={pub.userAvatar} className="w-14 h-14 rounded-2xl object-cover shadow-2xl border border-white/10" alt="avatar" />
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-4 border-zinc-900 rounded-full shadow-lg shadow-emerald-500/30"></div>
             </div>
-            <div>
-              <p className="text-sm font-black text-white leading-none mb-1">{pub.user}</p>
-              <div className="flex items-center gap-2">
-                <span className="text-[8px] text-zinc-600 font-bold uppercase tracking-widest">{new Date(pub.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+            <div className={isRTL ? 'text-right' : 'text-left'}>
+              <p className="text-base font-black text-white leading-none mb-1.5">{pub.user}</p>
+              <div className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                <span className="text-[9px] text-zinc-600 font-black uppercase tracking-widest">{new Date(pub.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                 <span className="w-1 h-1 rounded-full bg-zinc-800"></span>
-                <span className="text-[8px] text-pink-500/80 font-black uppercase tracking-widest">{pub.type}</span>
+                <span className="text-[9px] text-pink-500/80 font-black uppercase tracking-widest">{pub.type}</span>
               </div>
             </div>
           </div>
-          <button className="w-10 h-10 rounded-xl bg-white/5 text-zinc-600 hover:text-white transition-all">
+          <button className="w-12 h-12 rounded-2xl bg-white/5 text-zinc-600 hover:text-white hover:bg-white/10 transition-all border border-white/5">
             <i className="fa-solid fa-ellipsis"></i>
           </button>
         </div>
 
         {pub.type === 'text' ? (
-          <p className="text-sm lg:text-base text-zinc-200 leading-relaxed mb-6 font-medium">{pub.content}</p>
+          <p className={`text-sm lg:text-lg text-zinc-100 leading-relaxed mb-8 font-medium italic ${isRTL ? 'text-right' : 'text-left'}`}>"{pub.content}"</p>
         ) : (
-          <div className="space-y-4 mb-6">
-             {pub.description && <p className="text-sm text-zinc-300 font-medium">{pub.description}</p>}
-             <div className="rounded-3xl overflow-hidden border border-white/10 bg-zinc-950 relative shadow-inner group">
+          <div className="space-y-6 mb-8">
+             {pub.description && <p className={`text-sm text-zinc-300 font-medium ${isRTL ? 'text-right' : 'text-left'}`}>{pub.description}</p>}
+             <div className="rounded-[2.5rem] overflow-hidden border border-white/10 bg-zinc-950 relative shadow-2xl group/media">
+                <div className="absolute inset-0 bg-pink-600/5 opacity-0 group-hover/media:opacity-100 transition-opacity z-10 pointer-events-none"></div>
                 {pub.type === 'image' ? (
-                  <img src={pub.content} className="w-full h-auto object-cover max-h-[600px] group-hover:scale-[1.02] transition-transform duration-700" alt="post" />
+                  <img src={pub.content} className="w-full h-auto object-cover max-h-[700px] transition-transform duration-[2s] group-hover/media:scale-105" alt="post" />
                 ) : (
-                  <video ref={videoRef} src={pub.content} className="w-full h-auto object-cover max-h-[600px]" autoPlay muted loop playsInline />
+                  <video src={pub.content} className="w-full h-auto object-cover max-h-[700px]" autoPlay muted loop playsInline />
                 )}
              </div>
           </div>
         )}
 
-        <div className="flex items-center justify-between pt-6 border-t border-white/5">
-          <div className="flex gap-4 lg:gap-8">
-            <button onClick={() => onInteraction(pub.id, 'like')} className="flex items-center gap-3 text-zinc-500 hover:text-pink-500 transition-all active:scale-125 group">
-              <div className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center group-hover:bg-pink-500/10 group-active:text-pink-500 transition-all shadow-lg">
-                <i className="fa-solid fa-heart text-xs"></i>
+        <div className={`flex items-center justify-between pt-8 border-t border-white/5 ${isRTL ? 'flex-row-reverse' : ''}`}>
+          <div className={`flex gap-6 lg:gap-10 ${isRTL ? 'flex-row-reverse' : ''}`}>
+            <button onClick={() => onInteraction(pub.id, 'like')} className={`flex items-center gap-4 transition-all active:scale-125 group/like ${isRTL ? 'flex-row-reverse' : ''}`}>
+              <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center group-hover/like:bg-pink-500/10 transition-all shadow-xl group-active/like:text-pink-500">
+                <i className="fa-solid fa-heart text-sm text-zinc-500 group-hover/like:text-pink-500"></i>
               </div>
-              <span className="text-[10px] font-black tracking-widest">{pub.likes}</span>
+              <span className="text-[11px] font-black text-zinc-500 group-hover/like:text-white tabular-nums">{pub.likes}</span>
             </button>
-            <button onClick={() => setShowComments(!showComments)} className={`flex items-center gap-3 transition-all active:scale-95 group ${showComments ? 'text-indigo-400' : 'text-zinc-500 hover:text-indigo-400'}`}>
-              <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shadow-lg transition-all ${showComments ? 'bg-indigo-500/10' : 'bg-white/5'}`}>
-                <i className="fa-solid fa-comment text-xs"></i>
+            <button onClick={() => setShowComments(!showComments)} className={`flex items-center gap-4 transition-all active:scale-95 group/comm ${showComments ? 'text-indigo-400' : 'text-zinc-500'} ${isRTL ? 'flex-row-reverse' : ''}`}>
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-xl transition-all ${showComments ? 'bg-indigo-500/10' : 'bg-white/5'}`}>
+                <i className="fa-solid fa-comment text-sm"></i>
               </div>
-              <span className="text-[10px] font-black tracking-widest">{pub.comments?.length || 0}</span>
+              <span className="text-[11px] font-black group-hover/comm:text-white tabular-nums">{pub.comments?.length || 0}</span>
             </button>
           </div>
-          <button className="flex items-center gap-3 text-zinc-600 hover:text-white transition-all active:scale-95 group">
-             <div className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center group-hover:bg-white/10 transition-all shadow-lg">
-                <i className="fa-solid fa-share-nodes text-xs"></i>
+          <button className="flex items-center gap-3 text-zinc-700 hover:text-white transition-all active:scale-90">
+             <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center shadow-xl border border-white/5">
+                <i className="fa-solid fa-share-nodes text-sm"></i>
              </div>
           </button>
         </div>
       </div>
 
       {showComments && (
-        <div className="bg-black/20 p-6 lg:p-8 border-t border-white/5 space-y-6 animate-in slide-in-from-top-4 duration-500">
-          <div className="space-y-4 max-h-80 overflow-y-auto hide-scrollbar px-1">
+        <div className="bg-black/40 p-8 lg:p-10 border-t border-white/5 space-y-8 animate-in slide-in-from-top-6 duration-500">
+          <div className="space-y-6 max-h-96 overflow-y-auto hide-scrollbar px-2">
             {pub.comments?.map(c => (
-              <div key={c.id} className="flex gap-4 animate-in fade-in slide-in-from-left-2 duration-300">
-                <img src={`https://ui-avatars.com/api/?name=${c.user}&background=3f3f46&color=fff`} className="w-8 h-8 rounded-xl shrink-0 shadow-md" alt="avatar" />
-                <div className="flex-1 bg-zinc-900/80 rounded-2xl p-4 border border-white/5 shadow-inner">
-                   <div className="flex justify-between items-center mb-1">
+              <div key={c.id} className={`flex gap-5 animate-in fade-in slide-in-from-left-4 duration-400 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                <img src={`https://ui-avatars.com/api/?name=${c.user}&background=333&color=fff`} className="w-10 h-10 rounded-xl shrink-0 shadow-xl" alt="avatar" />
+                <div className={`flex-1 bg-zinc-900/60 rounded-3xl p-5 border border-white/5 shadow-inner ${isRTL ? 'text-right' : 'text-left'}`}>
+                   <div className={`flex justify-between items-center mb-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
                       <p className="text-[10px] font-black text-white uppercase tracking-widest">{c.user}</p>
-                      <span className="text-[8px] text-zinc-700 font-bold uppercase">{new Date(c.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                      <span className="text-[9px] text-zinc-700 font-bold uppercase">{new Date(c.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                    </div>
-                   <p className="text-xs text-zinc-400 leading-relaxed">{c.text}</p>
+                   <p className="text-xs text-zinc-400 leading-relaxed font-medium">{c.text}</p>
                 </div>
               </div>
             ))}
           </div>
-          <div className="flex gap-3 pt-6 border-t border-white/5">
+          <div className={`flex gap-4 pt-8 border-t border-white/5 ${isRTL ? 'flex-row-reverse' : ''}`}>
             <input 
-              type="text" placeholder="Add to the conversation..." value={commentText} onChange={(e) => setCommentText(e.target.value)}
-              className="flex-1 bg-black/40 border border-white/5 rounded-2xl px-5 py-3 text-xs text-white focus:outline-none focus:border-pink-500/50 transition-all shadow-inner"
+              type="text" 
+              placeholder={isRTL ? 'أضف تعليقك هنا...' : 'Add to the conversation...'} 
+              value={commentText} 
+              onChange={(e) => setCommentText(e.target.value)}
+              className={`flex-1 bg-black/60 border border-white/5 rounded-2xl px-6 py-4 text-xs text-white focus:outline-none focus:border-pink-500/30 transition-all shadow-inner ${isRTL ? 'text-right' : 'text-left'}`}
               onKeyDown={(e) => { if (e.key === 'Enter') { onComment(pub.id, commentText); setCommentText(''); } }}
             />
-            <button onClick={() => { onComment(pub.id, commentText); setCommentText(''); }} className="w-12 h-12 rounded-2xl bg-pink-600 flex items-center justify-center text-white shadow-xl shadow-pink-600/30 hover:bg-pink-500 transition-all active:scale-90"><i className="fa-solid fa-paper-plane text-[10px]"></i></button>
+            <button 
+              onClick={() => { onComment(pub.id, commentText); setCommentText(''); }} 
+              className="w-14 h-14 rounded-2xl bg-pink-600 flex items-center justify-center text-white shadow-2xl shadow-pink-600/30 hover:bg-pink-500 transition-all active:scale-90"
+            >
+              <i className={`fa-solid fa-paper-plane text-xs ${isRTL ? 'rotate-180' : ''}`}></i>
+            </button>
           </div>
         </div>
       )}

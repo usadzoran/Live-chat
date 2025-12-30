@@ -6,7 +6,7 @@ import {
   enableNetwork, where, Firestore, writeBatch
 } from 'firebase/firestore';
 import { getAuth, onAuthStateChanged, signInAnonymously, signOut, Auth } from 'firebase/auth';
-import { WithdrawalRecord, Publication, ViewType } from '../types';
+import { WithdrawalRecord, Publication, ViewType, Comment } from '../types';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAKnoCa3sKwZrQaUXy0PNkJ1FbsJGAOyjk",
@@ -31,6 +31,7 @@ export const MIN_WITHDRAW_GEMS = 2000;
 export const GEMS_PER_DOLLAR = 100;
 
 export interface UserDB {
+  uid: string; // Added UID field
   name: string;
   email: string;
   diamonds: number;
@@ -48,15 +49,26 @@ export interface UserDB {
   status?: 'active' | 'banned';
   role?: 'doll' | 'mentor' | 'admin';
   joinedAt?: string;
-  lastActiveView?: ViewType; // Persistent view state
+  lastActiveView?: ViewType;
 }
 
 class DatabaseService {
-  async getUser(email: string): Promise<UserDB | null> {
+  // Use UID for primary fetching to ensure persistence after refresh
+  async getUser(uid: string): Promise<UserDB | null> {
+    if (!uid || !db_fs) return null;
+    try {
+      const snap = await getDoc(doc(db_fs, 'users', uid));
+      return snap.exists() ? snap.data() as UserDB : null;
+    } catch (e) { return null; }
+  }
+
+  // Find user by email for login simulation
+  async getUserByEmail(email: string): Promise<UserDB | null> {
     if (!email || !db_fs) return null;
     try {
-      const snap = await getDoc(doc(db_fs, 'users', email.toLowerCase().trim()));
-      return snap.exists() ? snap.data() as UserDB : null;
+      const q = query(collection(db_fs, 'users'), where("email", "==", email.toLowerCase().trim()), limit(1));
+      const snap = await getDocs(q);
+      return !snap.empty ? snap.docs[0].data() as UserDB : null;
     } catch (e) { return null; }
   }
 
@@ -71,13 +83,12 @@ class DatabaseService {
 
   async upsertUser(user: UserDB): Promise<UserDB> {
     if (!db_fs) return user;
-    const email = user.email.toLowerCase().trim();
-    const userRef = doc(db_fs, 'users', email);
+    const userRef = doc(db_fs, 'users', user.uid);
     try {
-      const existing = await this.getUser(email);
+      const existing = await this.getUser(user.uid);
       const data = {
         ...user,
-        email,
+        email: user.email.toLowerCase().trim(),
         joinedAt: existing?.joinedAt || new Date().toISOString(),
         diamonds: user.diamonds ?? existing?.diamonds ?? 50,
         role: user.role || existing?.role || 'doll',
@@ -89,9 +100,9 @@ class DatabaseService {
     } catch (e) { return user; }
   }
 
-  async updateViewPreference(email: string, view: ViewType) {
-    if (!db_fs || !email) return;
-    const userRef = doc(db_fs, 'users', email.toLowerCase().trim());
+  async updateViewPreference(uid: string, view: ViewType) {
+    if (!db_fs || !uid) return;
+    const userRef = doc(db_fs, 'users', uid);
     await updateDoc(userRef, { lastActiveView: view });
   }
 
@@ -106,10 +117,9 @@ class DatabaseService {
     } catch (e) { return 0; }
   }
 
-  // Implementation of missing requestWithdrawal method
-  async requestWithdrawal(userEmail: string, paypalEmail: string, gems: number): Promise<{ success: boolean; message: string }> {
+  async requestWithdrawal(uid: string, paypalEmail: string, gems: number): Promise<{ success: boolean; message: string }> {
     if (!db_fs) return { success: false, message: "Database not connected" };
-    const user = await this.getUser(userEmail);
+    const user = await this.getUser(uid);
     if (!user || user.diamonds < gems) return { success: false, message: "Insufficient gems" };
 
     const withdrawal: WithdrawalRecord = {
@@ -121,7 +131,7 @@ class DatabaseService {
       timestamp: new Date()
     };
 
-    const userRef = doc(db_fs, 'users', userEmail.toLowerCase().trim());
+    const userRef = doc(db_fs, 'users', uid);
     await updateDoc(userRef, {
       diamonds: increment(-gems),
       withdrawals: arrayUnion(withdrawal)
@@ -130,7 +140,6 @@ class DatabaseService {
     return { success: true, message: "Withdrawal completed successfully!" };
   }
 
-  // Implementation of missing getPlatformStats method
   async getPlatformStats(): Promise<any> {
     const users = await this.getAllUsers();
     const revenue = await this.getPlatformRevenue();
@@ -153,23 +162,17 @@ class DatabaseService {
     };
   }
 
-  // Implementation of missing getAllWithdrawals method
   async getAllWithdrawals(): Promise<any[]> {
     const users = await this.getAllUsers();
     const withdrawals: any[] = [];
     users.forEach(u => {
       (u.withdrawals || []).forEach(w => {
-        withdrawals.push({
-          ...w,
-          userName: u.name,
-          userEmail: u.email
-        });
+        withdrawals.push({ ...w, userName: u.name, userEmail: u.email });
       });
     });
     return withdrawals.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }
 
-  // Implementation of missing clearAllData method
   async clearAllData(): Promise<{ success: boolean; message: string }> {
     if (!db_fs) return { success: false, message: "No DB connection" };
     try {
@@ -180,62 +183,65 @@ class DatabaseService {
         snap.docs.forEach(d => batch.delete(d.ref));
         await batch.commit();
       }
-      return { success: true, message: "Database nuked successfully." };
-    } catch (e: any) {
-      return { success: false, message: e.message };
-    }
+      return { success: true, message: "Database reset successfully." };
+    } catch (e: any) { return { success: false, message: e.message }; }
   }
 
-  // Implementation of missing toggleUserStatus method
-  async toggleUserStatus(email: string): Promise<void> {
-    const user = await this.getUser(email);
+  async toggleUserStatus(uid: string): Promise<void> {
+    const user = await this.getUser(uid);
     if (!user) return;
     const newStatus = user.status === 'banned' ? 'active' : 'banned';
-    await updateDoc(doc(db_fs, 'users', email.toLowerCase().trim()), { status: newStatus });
+    await updateDoc(doc(db_fs, 'users', uid), { status: newStatus });
   }
 
-  // Implementation of missing capturePaypalOrder method
-  async capturePaypalOrder(orderID: string, email: string, amount: number, price: number): Promise<{ success: boolean; message: string }> {
+  async capturePaypalOrder(orderID: string, uid: string, amount: number, price: number): Promise<{ success: boolean; message: string }> {
     if (!db_fs) return { success: false, message: "DB error" };
     try {
       const transRef = doc(db_fs, 'transactions', orderID);
       await setDoc(transRef, {
         orderID,
-        userEmail: email,
+        userUid: uid,
         gems: amount,
         price,
         status: 'COMPLETED',
         timestamp: Timestamp.now()
       });
-
-      const userRef = doc(db_fs, 'users', email.toLowerCase().trim());
-      await updateDoc(userRef, {
-        diamonds: increment(amount)
-      });
-
-      return { success: true, message: "Order captured and gems credited!" };
-    } catch (e: any) {
-      return { success: false, message: e.message };
-    }
+      const userRef = doc(db_fs, 'users', uid);
+      await updateDoc(userRef, { diamonds: increment(amount) });
+      return { success: true, message: "Order captured!" };
+    } catch (e: any) { return { success: false, message: e.message }; }
   }
 
-  async logout() {
-    await signOut(auth);
-  }
+  async logout() { await signOut(auth); }
 
   subscribeToFeed(callback: (pubs: Publication[]) => void) {
     if (!db_fs) return () => {};
     const q = query(collection(db_fs, 'publications'), orderBy('timestamp', 'desc'), limit(50));
     return onSnapshot(q, (snap) => {
-      callback(snap.docs.map(d => ({ ...d.data(), timestamp: (d.data().timestamp as Timestamp)?.toDate() || new Date() } as Publication)));
+      const pubs = snap.docs.map(d => {
+        const data = d.data();
+        return { 
+          ...data, 
+          id: d.id,
+          timestamp: (data.timestamp as Timestamp)?.toDate() || new Date() 
+        } as Publication;
+      });
+      callback(pubs);
     });
   }
 
   async addPublication(pub: Publication): Promise<void> {
-    await setDoc(doc(db_fs, 'publications', pub.id), { ...pub, timestamp: Timestamp.now() });
+    if (!db_fs) return;
+    const pubRef = doc(collection(db_fs, 'publications'));
+    await setDoc(pubRef, { 
+      ...pub, 
+      id: pubRef.id, 
+      timestamp: Timestamp.now() 
+    });
   }
 
   async updatePublication(pub: Publication): Promise<void> {
+    if (!db_fs) return;
     const pubRef = doc(db_fs, 'publications', pub.id);
     await updateDoc(pubRef, {
       likes: pub.likes,

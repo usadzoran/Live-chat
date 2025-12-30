@@ -25,23 +25,18 @@ const AppContent: React.FC = () => {
   const [isInitializing, setIsInitializing] = useState(true);
   const [platformRevenue, setPlatformRevenue] = useState<number>(0);
 
-  // Persistence: Use Firebase Auth Listener instead of localStorage
+  // Persistence: Direct real-time cloud session monitoring
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setIsInitializing(true);
-      
       if (firebaseUser) {
-        // Find user by email (linked to Firebase Auth or our custom store)
-        // Note: For simplicity, we use the email as the link
-        const email = firebaseUser.email || firebaseUser.uid; 
-        const u = await db.getUser(email);
+        // User exists in cloud session. Fetch profile from Firestore using UID
+        const u = await db.getUser(firebaseUser.uid);
         
         if (u) {
           setUser(u);
           setIsAuthenticated(true);
           setIsAdmin(u.role === 'admin' || u.email === 'admin@mydoll.club');
           
-          // Restore View directly from Database
           if (u.lastActiveView) {
             setCurrentView(u.lastActiveView);
           }
@@ -49,26 +44,32 @@ const AppContent: React.FC = () => {
           if (window.location.hash === '#/admin-portal' && (u.role === 'admin' || u.email === 'admin@mydoll.club')) {
             setCurrentView('admin');
           }
+        } else {
+          // Firebase Auth session exists but no Firestore profile yet (rare case)
+          setIsAuthenticated(false);
         }
       } else {
+        // No session found
         setIsAuthenticated(false);
         setUser(null);
         setIsAdmin(false);
       }
 
+      // Pre-fetch revenue for dashboard if admin
       const rev = await db.getPlatformRevenue();
       setPlatformRevenue(rev);
       
-      setTimeout(() => setIsInitializing(false), 1200);
+      // Delay to ensure UI transition is smooth
+      setTimeout(() => setIsInitializing(false), 1500);
     });
 
     return () => unsubscribe();
   }, []);
 
-  // Sync Current View to Database on change
+  // Sync Current View to Database on change for cloud-only persistence
   useEffect(() => {
     if (isAuthenticated && user) {
-      db.updateViewPreference(user.email, currentView);
+      db.updateViewPreference(user.uid, currentView);
     }
   }, [currentView, isAuthenticated, user]);
 
@@ -77,13 +78,14 @@ const AppContent: React.FC = () => {
       (email === 'wahabfresh' || name === 'wahabfresh' || email === 'admin@mydoll.club') && 
       password === 'vampirewahab31';
     
-    // In a real app, you'd use signInWithEmailAndPassword. 
-    // Here we use anonymous sign-in or a simple link to simulate auth without setup complexity.
-    await signInAnonymously(auth);
+    // Auth anonymously for simple session, but document is stored by UID
+    const cred = await signInAnonymously(auth);
+    const uid = cred.user.uid;
     
-    let u = await db.getUser(email);
+    let u = await db.getUser(uid);
     if (!u) {
       u = await db.upsertUser({ 
+        uid,
         name, 
         email, 
         diamonds: isAdminUser ? 0 : 50,
@@ -123,7 +125,7 @@ const AppContent: React.FC = () => {
         </div>
         <div className="text-center animate-in fade-in zoom-in duration-1000">
           <h2 className="text-white font-black tracking-[0.6em] uppercase text-[10px] mb-2">My Doll Club</h2>
-          <p className="text-zinc-800 text-[8px] font-black uppercase tracking-[0.8em]">Cloud Syncing Session...</p>
+          <p className="text-zinc-800 text-[8px] font-black uppercase tracking-[0.8em]">Secure Cloud Protocol Active</p>
         </div>
       </div>
     );
@@ -144,7 +146,7 @@ const AppContent: React.FC = () => {
           {currentView === 'discovery' && <DiscoveryView />}
           {currentView === 'live' && <LiveBroadcasterView />}
           {currentView === 'admin' && <AdminDashboard totalRevenue={platformRevenue} />}
-          {currentView === 'store' && <StoreView user={user!} onPurchaseSuccess={() => db.getUser(user!.email).then(setUser)} onBack={() => setCurrentView('feed')} />}
+          {currentView === 'store' && <StoreView user={user!} onPurchaseSuccess={() => db.getUser(user!.uid).then(setUser)} onBack={() => setCurrentView('feed')} />}
         </div>
       </main>
       {currentView !== 'admin' && <BottomNav activeView={currentView} onNavigate={setCurrentView} />}
