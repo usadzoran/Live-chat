@@ -25,7 +25,7 @@ const AppContent: React.FC = () => {
   const [platformRevenue, setPlatformRevenue] = useState<number>(0);
   const [pendingReferrer, setPendingReferrer] = useState<string | null>(null);
 
-  // Sync currentView to localStorage whenever it changes
+  // Sync currentView to localStorage whenever it changes to persist navigation state
   useEffect(() => {
     if (isAuthenticated) {
       localStorage.setItem('mydoll_active_view', currentView);
@@ -34,7 +34,7 @@ const AppContent: React.FC = () => {
 
   useEffect(() => {
     const handleHashChange = () => {
-      if (window.location.hash === '#/admin-portal') {
+      if (window.location.hash === '#/admin-portal' && !isAuthenticated) {
         setShowAuth(true);
       }
     };
@@ -45,7 +45,7 @@ const AppContent: React.FC = () => {
       setIsInitializing(true);
       const hash = window.location.hash;
       
-      // Handle Referral
+      // Handle Referral logic
       if (hash.includes('ref=')) {
         try {
           const encodedEmail = hash.split('ref=')[1];
@@ -56,32 +56,34 @@ const AppContent: React.FC = () => {
         }
       }
 
-      // Restore Session
+      // 🔐 RESTORE SESSION: Check if user was previously logged in
       const savedSession = localStorage.getItem('mydoll_active_user');
       const savedView = localStorage.getItem('mydoll_active_view') as ViewType;
 
       if (savedSession) {
         try {
+          // Fetch fresh data from DB to ensure session is still valid
           const u = await db.getUser(savedSession);
           if (u) {
             setUser(u);
             setIsAuthenticated(true);
             
-            // Restore View
+            // Restore last active view or default to feed
             if (savedView) {
               setCurrentView(savedView);
             }
 
-            // Check Admin Status
-            const isSystemAdmin = u.email === 'admin@mydoll.club' || u.name === 'wahabfresh' || u.role === 'admin';
+            // Check Admin Status based on role or specific admin emails
+            const isSystemAdmin = u.role === 'admin' || u.email === 'admin@mydoll.club' || u.name === 'wahabfresh';
             if (isSystemAdmin) {
               setIsAdmin(true);
-              if (hash === '#/admin-portal' || !hash || hash === '#/') {
+              // If admin portal hash is present, force admin view
+              if (hash === '#/admin-portal') {
                 setCurrentView('admin');
               }
             }
           } else {
-            // If user no longer exists in DB, clear local session
+            // User not found in DB, clear local stale session
             localStorage.removeItem('mydoll_active_user');
             localStorage.removeItem('mydoll_active_view');
           }
@@ -90,16 +92,17 @@ const AppContent: React.FC = () => {
         }
       }
 
-      // Always allow showing auth if hash is admin portal even if not logged in
+      // Handle direct navigation to admin portal
       if (hash === '#/admin-portal' && !savedSession) {
         setShowAuth(true);
       }
 
+      // Load platform revenue for admin context if needed
       const rev = await db.getPlatformRevenue();
       setPlatformRevenue(rev);
       
-      // Artificial slight delay for a smooth professional transition
-      setTimeout(() => setIsInitializing(false), 800);
+      // Professional loading transition
+      setTimeout(() => setIsInitializing(false), 1200);
     };
 
     init();
@@ -107,6 +110,7 @@ const AppContent: React.FC = () => {
   }, []);
 
   const handleLogin = async (name: string, email: string, password?: string) => {
+    // Admin credentials bypass/override
     const isAdminUser = 
       (email === 'wahabfresh' || name === 'wahabfresh' || email === 'admin@mydoll.club') && 
       password === 'vampirewahab31';
@@ -135,7 +139,10 @@ const AppContent: React.FC = () => {
     
     setUser(u);
     setIsAuthenticated(true);
+    
+    // Save to localStorage for persistence
     localStorage.setItem('mydoll_active_user', email);
+    localStorage.setItem('mydoll_active_view', u.role === 'admin' ? 'admin' : 'feed');
     
     if (window.location.hash !== '#/admin-portal') {
       window.location.hash = '';
@@ -149,6 +156,7 @@ const AppContent: React.FC = () => {
   };
 
   const handleLogout = () => {
+    // ONLY clear when explicitly requested
     setIsAuthenticated(false);
     setIsAdmin(false);
     setShowAuth(false);
@@ -167,24 +175,25 @@ const AppContent: React.FC = () => {
     setPlatformRevenue(freshRev);
   };
 
-  // Professional Loading Screen
+  // Loading Screen (Professional UX)
   if (isInitializing) {
     return (
-      <div className="h-screen w-screen bg-black flex flex-col items-center justify-center gap-6">
+      <div className="h-screen w-screen bg-black flex flex-col items-center justify-center gap-8">
         <div className="relative">
-          <div className="w-20 h-20 rounded-[2rem] stream-gradient animate-pulse flex items-center justify-center shadow-[0_0_50px_rgba(244,114,182,0.3)]">
-            <i className="fa-solid fa-face-grin-stars text-white text-3xl animate-bounce"></i>
+          <div className="w-24 h-24 rounded-[2.5rem] stream-gradient animate-pulse flex items-center justify-center shadow-[0_0_80px_rgba(244,114,182,0.4)]">
+            <i className="fa-solid fa-face-grin-stars text-white text-4xl animate-bounce"></i>
           </div>
-          <div className="absolute inset-0 border-2 border-white/10 rounded-[2.2rem] scale-110 animate-spin duration-[3s]"></div>
+          <div className="absolute inset-0 border-2 border-white/5 rounded-[2.8rem] scale-125 animate-spin duration-[4s]"></div>
         </div>
-        <div className="text-center">
-          <h2 className="text-white font-black tracking-[0.4em] uppercase text-xs mb-2">My Doll Club</h2>
-          <p className="text-zinc-700 text-[8px] font-black uppercase tracking-[0.6em]">Initializing Elite Session...</p>
+        <div className="text-center animate-in fade-in zoom-in duration-1000">
+          <h2 className="text-white font-black tracking-[0.5em] uppercase text-xs mb-3">My Doll Club</h2>
+          <p className="text-zinc-800 text-[10px] font-black uppercase tracking-[0.8em]">Restoring Secure Session...</p>
         </div>
       </div>
     );
   }
 
+  // Auth Routing
   if (!isAuthenticated) {
     if (showAuth) {
       return <AuthPage onLogin={handleLogin} onBack={() => {
