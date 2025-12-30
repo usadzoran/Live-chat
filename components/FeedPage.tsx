@@ -29,7 +29,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
   // Real-time Firestore Subscription: Ensures data is always fresh without manual reloads
   useEffect(() => {
     const unsubscribe = db.subscribeToFeed((newPubs) => {
-      setPublications(newPubs);
+      setPublications([...newPubs]);
       setIsRefreshing(false);
       setPullDistance(0);
     });
@@ -56,9 +56,11 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
       setNewPostText('');
       setMediaUrl(null);
       setSelectedType('text');
+      // Scroll to top to see the new post instantly
       containerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (e) {
       console.error("Publishing failed", e);
+      alert(isRTL ? "فشل النشر، يرجى التحقق من الاتصال" : "Publishing failed, please check connection");
     } finally {
       setIsPublishing(false);
     }
@@ -66,7 +68,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
 
   const handleRefresh = () => {
     setIsRefreshing(true);
-    // Data is real-time via subscription, but we simulate visual feedback
+    // Data is real-time via subscription, but we simulate visual feedback to reassure the user
     setTimeout(() => {
       setIsRefreshing(false);
       setPullDistance(0);
@@ -256,6 +258,13 @@ const PublicationCard: React.FC<PublicationCardProps> = ({ pub, onLike, onDislik
   const [commentText, setCommentText] = useState('');
   const [showComments, setShowComments] = useState(false);
 
+  // Helper to safely format timestamp
+  const formatTime = (ts: any) => {
+    if (!ts) return '';
+    const date = ts instanceof Date ? ts : (typeof ts.toDate === 'function' ? ts.toDate() : new Date(ts));
+    return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+  };
+
   return (
     <div className="glass-panel rounded-[2.5rem] border-white/5 overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-700 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.6)] bg-zinc-900/30 backdrop-blur-xl group">
       <div className="p-8 lg:p-10">
@@ -269,7 +278,7 @@ const PublicationCard: React.FC<PublicationCardProps> = ({ pub, onLike, onDislik
               <p className="text-base font-black text-white leading-none mb-1.5">{pub.user}</p>
               <div className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
                 <span className="text-[9px] text-zinc-600 font-black uppercase tracking-widest">
-                  {pub.timestamp instanceof Date ? pub.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}
+                  {formatTime(pub.timestamp)}
                 </span>
                 <span className="w-1 h-1 rounded-full bg-zinc-800"></span>
                 <span className="text-[9px] text-pink-500/80 font-black uppercase tracking-widest">{pub.type}</span>
@@ -335,7 +344,7 @@ const PublicationCard: React.FC<PublicationCardProps> = ({ pub, onLike, onDislik
                 <div className={`flex-1 bg-zinc-900/60 rounded-3xl p-5 border border-white/5 shadow-inner ${isRTL ? 'text-right' : 'text-left'}`}>
                    <div className={`flex justify-between items-center mb-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
                       <p className="text-[10px] font-black text-white uppercase tracking-widest">{c.user}</p>
-                      <span className="text-[9px] text-zinc-700 font-bold uppercase">{new Date(c.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                      <span className="text-[9px] text-zinc-700 font-bold uppercase">{formatTime(c.timestamp)}</span>
                    </div>
                    <p className="text-xs text-zinc-400 leading-relaxed font-medium">{c.text}</p>
                 </div>

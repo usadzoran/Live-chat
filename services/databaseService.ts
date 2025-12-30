@@ -171,24 +171,28 @@ class DatabaseService {
   
   subscribeToFeed(callback: (pubs: Publication[]) => void) {
     if (!db_fs) return () => {};
-    // Use orderBy with serverTimestamp for consistent results
+    // Ensure publications are ordered by timestamp even for new items
     const q = query(collection(db_fs, 'publications'), orderBy('timestamp', 'desc'), limit(50));
     
     return onSnapshot(q, (snap) => {
       const pubs = snap.docs.map(d => {
         const data = d.data();
-        // Handle cases where timestamp might be null during local pending updates
         let ts: Date;
+        
+        // Safety check for Firestore Timestamp during latency compensation
         if (data.timestamp && typeof (data.timestamp as any).toDate === 'function') {
           ts = (data.timestamp as Timestamp).toDate();
         } else {
-          ts = new Date(); // Fallback for latency compensation
+          ts = new Date(); // Use local time for newly added items not yet confirmed by server
         }
 
         return { 
           ...data, 
           id: d.id,
-          timestamp: ts
+          timestamp: ts,
+          likes: data.likes || 0,
+          dislikes: data.dislikes || 0,
+          comments: data.comments || []
         } as Publication;
       });
       callback(pubs);
@@ -199,15 +203,20 @@ class DatabaseService {
 
   async addPublication(pub: Omit<Publication, 'id' | 'timestamp'>): Promise<void> {
     if (!db_fs) return;
-    const pubRef = doc(collection(db_fs, 'publications'));
-    await setDoc(pubRef, { 
-      ...pub, 
-      id: pubRef.id, 
-      timestamp: serverTimestamp(),
-      likes: 0,
-      dislikes: 0,
-      comments: []
-    });
+    try {
+      const pubRef = doc(collection(db_fs, 'publications'));
+      await setDoc(pubRef, { 
+        ...pub, 
+        id: pubRef.id, 
+        timestamp: serverTimestamp(),
+        likes: 0,
+        dislikes: 0,
+        comments: []
+      });
+    } catch (err) {
+      console.error("Failed to add publication:", err);
+      throw err;
+    }
   }
 
   async likePublication(pubId: string) {
