@@ -33,60 +33,80 @@ const StreamView: React.FC<StreamViewProps> = ({ status, isCamOff, title, onTitl
   }, [status]);
 
   return (
-    <div className="flex-1 rounded-3xl overflow-hidden glass-panel relative shadow-2xl group border border-zinc-800 flex flex-col">
+    <div className="flex-1 rounded-[2.5rem] lg:rounded-[3.5rem] overflow-hidden glass-panel relative shadow-[0_0_100px_rgba(0,0,0,0.5)] group border border-white/5 flex flex-col bg-black">
       
-      {/* Dynamic Title Bar Overlay */}
-      <div className="absolute top-0 left-0 right-0 p-6 z-30 pointer-events-none">
-        <div className="max-w-xl mx-auto pointer-events-auto">
+      {/* Cinematic Scanline Effect */}
+      <div className="absolute inset-0 pointer-events-none z-10 opacity-[0.03]" style={{ backgroundImage: 'linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06))', backgroundSize: '100% 4px, 3px 100%' }}></div>
+
+      {/* Top Overlay: Title & Stats */}
+      <div className="absolute top-0 left-0 right-0 p-8 z-30 pointer-events-none flex justify-between items-start">
+        <div className="max-w-md pointer-events-auto">
           {isIdle ? (
             <div className="relative group/input">
-              <div className="absolute inset-0 bg-indigo-500/10 blur-xl opacity-0 group-focus-within/input:opacity-100 transition-opacity"></div>
               <input 
                 type="text" 
                 value={title}
                 onChange={(e) => onTitleChange(e.target.value)}
-                placeholder="Enter stream title..."
-                className="w-full bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-3 text-lg font-bold text-white placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/10 transition-all text-center shadow-2xl"
+                placeholder="Session Title..."
+                className="bg-black/40 backdrop-blur-2xl border border-white/10 rounded-2xl px-6 py-4 text-xl font-black text-white placeholder:text-zinc-700 focus:outline-none focus:border-pink-500/50 focus:ring-4 focus:ring-pink-500/10 transition-all shadow-2xl"
               />
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 text-[10px] font-bold text-zinc-500 uppercase tracking-widest pointer-events-none opacity-0 group-hover/input:opacity-100 transition-opacity">
-                <i className="fa-solid fa-pen-to-square"></i>
-                Edit Title
-              </div>
             </div>
           ) : (
-            <div className="flex flex-col items-center animate-in fade-in slide-in-from-top-4 duration-500">
-               <div className="px-8 py-3 bg-black/60 backdrop-blur-2xl rounded-2xl border border-white/10 shadow-2xl inline-block">
-                  <h1 className="text-xl md:text-2xl font-black text-white tracking-tight uppercase italic flex items-center gap-3">
-                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-                    {title}
-                  </h1>
-               </div>
-               <div className="mt-2 px-3 py-1 bg-indigo-600/20 border border-indigo-500/20 rounded-full">
-                  <span className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em]">Broadcast Session Active</span>
+            <div className="animate-in fade-in slide-in-from-top-4 duration-700">
+               <div className="px-6 py-3 bg-black/40 backdrop-blur-3xl rounded-2xl border border-white/10 shadow-2xl inline-flex items-center gap-4">
+                  <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.8)]"></div>
+                  <h1 className="text-lg font-black text-white tracking-tight uppercase italic">{title}</h1>
                </div>
             </div>
           )}
         </div>
+
+        <div className="flex flex-col gap-2 items-end pointer-events-auto">
+           <div className="flex items-center gap-3 px-4 py-2 bg-black/40 backdrop-blur-3xl rounded-xl border border-white/10 shadow-xl">
+              <i className="fa-solid fa-eye text-pink-500 text-xs"></i>
+              <span className="text-xs font-black text-white tabular-nums">{isLive ? '1.8K' : '0'}</span>
+           </div>
+           <div className="flex items-center gap-3 px-4 py-2 bg-black/40 backdrop-blur-3xl rounded-xl border border-white/10 shadow-xl">
+              <i className="fa-solid fa-heart text-rose-500 text-xs"></i>
+              <span className="text-xs font-black text-white tabular-nums">{isLive ? '12.4K' : '0'}</span>
+           </div>
+        </div>
       </div>
 
-      {/* Background/Offline State */}
-      <div className="absolute inset-0 flex items-center justify-center bg-zinc-900 overflow-hidden">
+      {/* AI Listening Waveform */}
+      {isLive && (
+        <div className="absolute top-1/2 right-8 -translate-y-1/2 z-30 flex flex-col items-center gap-4 pointer-events-none">
+           <div className="flex gap-1 items-center h-16">
+             {[1,2,3,4,5,6,7,8].map(i => (
+               <div key={i} className="w-1 bg-pink-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(236,72,153,0.5)]" 
+                 style={{ 
+                   height: `${30 + Math.random() * 70}%`, 
+                   animationDuration: `${0.5 + Math.random()}s`,
+                   opacity: 0.6 + Math.random() * 0.4 
+                 }}
+               ></div>
+             ))}
+           </div>
+           <span className="text-[8px] font-black text-pink-500 uppercase tracking-[0.4em] rotate-90 origin-center translate-y-8">AI Companion Active</span>
+        </div>
+      )}
+
+      {/* Placeholder State */}
+      <div className="absolute inset-0 flex items-center justify-center bg-zinc-950 overflow-hidden">
         {(status === StreamStatus.IDLE || isCamOff) && (
-          <div className="flex flex-col items-center gap-4 text-center z-10 animate-in fade-in duration-500">
-            <div className="w-24 h-24 rounded-full bg-zinc-800/50 flex items-center justify-center border border-zinc-700">
-              <i className="fa-solid fa-user-ninja text-4xl text-zinc-600"></i>
+          <div className="flex flex-col items-center gap-8 text-center z-10 animate-in fade-in zoom-in duration-1000">
+            <div className="relative">
+              <div className="absolute inset-0 bg-pink-600/20 blur-[60px] rounded-full animate-pulse"></div>
+              <div className="w-32 h-32 rounded-[3rem] bg-zinc-900 flex items-center justify-center border border-white/5 relative z-10 shadow-2xl">
+                <i className="fa-solid fa-video-slash text-5xl text-zinc-800"></i>
+              </div>
             </div>
             <div>
-              <p className="text-zinc-400 font-medium">Camera is disabled</p>
-              <p className="text-xs text-zinc-600">Go live to start the stream</p>
+              <p className="text-xl font-black text-white uppercase tracking-tighter mb-2">Feed Encrypted</p>
+              <p className="text-xs text-zinc-500 font-bold uppercase tracking-widest">Go Live to Start Broadcasting</p>
             </div>
           </div>
         )}
-        
-        {/* Background animation for techy feel */}
-        <div className="absolute inset-0 opacity-10 pointer-events-none">
-           <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle, #333 1px, transparent 1px)', backgroundSize: '32px 32px' }}></div>
-        </div>
       </div>
 
       {/* Main Video Element */}
@@ -95,39 +115,30 @@ const StreamView: React.FC<StreamViewProps> = ({ status, isCamOff, title, onTitl
         autoPlay
         playsInline
         muted
-        className={`w-full h-full object-cover transition-opacity duration-700 ${status !== StreamStatus.IDLE && !isCamOff ? 'opacity-100' : 'opacity-0'}`}
+        className={`w-full h-full object-cover transition-all duration-1000 ${status !== StreamStatus.IDLE && !isCamOff ? 'opacity-100 scale-100' : 'opacity-0 scale-110'}`}
       />
 
-      {/* Stream Stats Overlays (Bottom) */}
-      <div className="absolute top-24 left-6 flex flex-col gap-2 pointer-events-none z-20">
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-lg border border-white/10">
-          <div className={`w-2 h-2 rounded-full ${isLive ? 'bg-red-500' : 'bg-zinc-500'}`}></div>
-          <span className="text-[10px] font-bold text-white uppercase tracking-wider">
-            {isLive ? 'LIVE' : 'OFFLINE'}
-          </span>
-        </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-lg border border-white/10">
-          <i className="fa-solid fa-eye text-[10px] text-zinc-400"></i>
-          <span className="text-[10px] font-bold text-white uppercase tracking-wider">{isLive ? '1.2K' : '0'}</span>
-        </div>
-      </div>
-
-      <div className="absolute bottom-6 left-6 pointer-events-none z-20">
-         <div className="px-4 py-2 bg-black/60 backdrop-blur-md rounded-xl border border-white/10">
-            <h2 className="text-sm font-bold text-white">{isIdle ? 'Stream Setup' : title}</h2>
-            <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest">Real-time AI Engagement</p>
-         </div>
-      </div>
-
-      {/* Visual Indicator of AI Active */}
-      {status === StreamStatus.LIVE && (
-        <div className="absolute top-24 right-6 flex items-center gap-3 bg-black/40 backdrop-blur-md p-2 rounded-2xl border border-indigo-500/30 z-20">
-           <div className="flex gap-1 items-end h-4 w-8">
-             {[1,2,3,4,5].map(i => (
-               <div key={i} className="flex-1 bg-indigo-500 rounded-t-sm animate-pulse" style={{ height: `${Math.random() * 100}%`, animationDelay: `${i * 0.1}s` }}></div>
-             ))}
+      {/* Bottom Information Overlay */}
+      {!isIdle && (
+        <div className="absolute bottom-8 left-8 right-8 z-30 flex justify-between items-end pointer-events-none">
+           <div className="flex items-center gap-4 pointer-events-auto">
+              <div className="w-12 h-12 rounded-2xl overflow-hidden border-2 border-pink-500 shadow-lg shadow-pink-500/20">
+                 <img src="https://ui-avatars.com/api/?name=Admin&background=f472b6&color=fff" className="w-full h-full object-cover" alt="streamer" />
+              </div>
+              <div className="glass-panel px-5 py-3 rounded-2xl border-white/10 bg-black/20 backdrop-blur-3xl">
+                 <p className="text-[10px] font-black text-pink-500 uppercase tracking-widest mb-0.5">Streamer Node</p>
+                 <p className="text-sm font-black text-white tracking-tight">Master Admin</p>
+              </div>
            </div>
-           <span className="text-[10px] font-bold text-indigo-200">AI LISTENING</span>
+           
+           <div className="flex items-center gap-3 glass-panel px-4 py-3 rounded-2xl border-white/10 pointer-events-auto bg-black/20 backdrop-blur-3xl">
+              <div className="flex flex-col items-end">
+                 <p className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">Resolution</p>
+                 <p className="text-[10px] font-black text-white">1080p · 60FPS</p>
+              </div>
+              <div className="w-[1px] h-6 bg-white/10 mx-1"></div>
+              <i className="fa-solid fa-signal text-[10px] text-emerald-500"></i>
+           </div>
         </div>
       )}
     </div>
