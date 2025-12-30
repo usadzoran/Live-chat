@@ -60,30 +60,34 @@ const AppContent: React.FC = () => {
       (email === 'wahabfresh' || name === 'wahabfresh' || email === 'admin@mydoll.club') && 
       password === 'vampirewahab31';
     
-    const cred = await signInAnonymously(auth);
-    const uid = cred.user.uid;
-    
-    let u = await db.getUser(uid);
-    if (!u) {
-      u = await db.upsertUser({ 
-        uid,
-        name, 
-        email, 
-        diamonds: isAdminUser ? 0 : 50,
-        bio: isAdminUser ? "Master Node Administrator" : "Elite member",
-        usd_balance: 0,
-        withdrawals: [],
-        album: [],
-        referralCount: 0,
-        role: isAdminUser ? 'admin' : 'doll',
-        lastActiveView: isAdminUser ? 'admin' : 'feed'
-      });
-    }
+    try {
+      const cred = await signInAnonymously(auth);
+      const uid = cred.user.uid;
+      
+      let u = await db.getUser(uid);
+      if (!u) {
+        u = await db.upsertUser({ 
+          uid,
+          name, 
+          email, 
+          diamonds: isAdminUser ? 0 : 50,
+          bio: isAdminUser ? "Master Node Administrator" : "Elite member",
+          usd_balance: 0,
+          withdrawals: [],
+          album: [],
+          referralCount: 0,
+          role: isAdminUser ? 'admin' : 'doll',
+          lastActiveView: isAdminUser ? 'admin' : 'feed'
+        });
+      }
 
-    setIsAdmin(isAdminUser || u.role === 'admin');
-    setUser(u);
-    setIsAuthenticated(true);
-    setCurrentView(u.lastActiveView || 'feed');
+      setIsAdmin(isAdminUser || u.role === 'admin');
+      setUser(u);
+      setIsAuthenticated(true);
+      setCurrentView(u.lastActiveView || 'feed');
+    } catch (error) {
+      console.error("Login failed", error);
+    }
   };
 
   const handleLogout = async () => {
@@ -111,7 +115,11 @@ const AppContent: React.FC = () => {
   }
 
   if (!isAuthenticated) {
-    return showAuth ? <AuthPage onLogin={handleLogin} onBack={() => setShowAuth(false)} /> : <LandingPage onGetStarted={() => setShowAuth(true)} />;
+    return showAuth ? (
+      <AuthPage onLogin={handleLogin} onBack={() => setShowAuth(false)} />
+    ) : (
+      <LandingPage onGetStarted={() => setShowAuth(true)} />
+    );
   }
 
   return (
@@ -119,13 +127,26 @@ const AppContent: React.FC = () => {
       <Header user={user} isAdmin={isAdmin} onLogout={handleLogout} onNavigate={setCurrentView} />
       <main className="flex-1 overflow-hidden relative">
         <div className={`absolute inset-0 ${currentView === 'admin' ? 'p-0' : 'p-3 pb-24 md:p-6 md:pb-8 lg:p-8 lg:pb-12'}`}>
-          {currentView === 'profile' && <ProfileView user={user!} onUpdate={setUser} onBack={() => setCurrentView('feed')} onNavigate={setCurrentView} />}
-          {currentView === 'feed' && <FeedPage user={user!} />}
-          {currentView === 'messages' && <MessagesView currentUser={user!} />}
+          {currentView === 'profile' && user && (
+            <ProfileView 
+              user={user} 
+              onUpdate={setUser} 
+              onBack={() => setCurrentView('feed')} 
+              onNavigate={setCurrentView} 
+            />
+          )}
+          {currentView === 'feed' && user && <FeedPage user={user} />}
+          {currentView === 'messages' && user && <MessagesView currentUser={user} />}
           {currentView === 'discovery' && <DiscoveryView />}
-          {currentView === 'live' && <LiveBroadcasterView user={user!} />}
+          {currentView === 'live' && <LiveBroadcasterView user={user || undefined} />}
           {currentView === 'admin' && <AdminDashboard totalRevenue={platformRevenue} />}
-          {currentView === 'store' && <StoreView user={user!} onPurchaseSuccess={() => db.getUser(user!.uid).then(setUser)} onBack={() => setCurrentView('feed')} />}
+          {currentView === 'store' && user && (
+            <StoreView 
+              user={user} 
+              onPurchaseSuccess={() => db.getUser(user.uid).then(setUser)} 
+              onBack={() => setCurrentView('feed')} 
+            />
+          )}
         </div>
       </main>
       {currentView !== 'admin' && <BottomNav activeView={currentView} onNavigate={setCurrentView} />}
@@ -133,5 +154,10 @@ const AppContent: React.FC = () => {
   );
 };
 
-const App: React.FC = () => <LanguageProvider><AppContent /></LanguageProvider>;
+const App: React.FC = () => (
+  <LanguageProvider>
+    <AppContent />
+  </LanguageProvider>
+);
+
 export default App;
