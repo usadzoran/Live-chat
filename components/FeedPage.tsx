@@ -3,15 +3,24 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Publication, Comment } from '../types';
 import { db } from '../services/databaseService';
 import { useTranslation } from '../contexts/LanguageContext';
+import { Timestamp } from 'firebase/firestore';
 
 interface FeedPageProps {
   user: { name: string; avatar?: string; email: string; uid: string };
 }
 
-// Extend Publication type for internal UI state
 interface PublicationWithState extends Publication {
   isPending?: boolean;
 }
+
+const FEATURED_CREATORS = [
+  { name: 'Aurora', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=400&fit=crop', live: true },
+  { name: 'Sasha', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop', live: false },
+  { name: 'Luna', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop', live: true },
+  { name: 'Jade', avatar: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=400&h=400&fit=crop', live: false },
+  { name: 'Amara', avatar: 'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=400&h=400&fit=crop', live: true },
+  { name: 'Chloe', avatar: 'https://images.unsplash.com/photo-1512485694743-9c9538b4e6e0?w=400&h=400&fit=crop', live: false },
+];
 
 const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
   const [publications, setPublications] = useState<PublicationWithState[]>([]);
@@ -22,7 +31,6 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const { t, isRTL } = useTranslation();
   
-  // Pull to Refresh States
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
   const [isPulling, setIsPulling] = useState(false);
@@ -67,21 +75,13 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
       setMediaUrl(null);
       setSelectedType('text');
       containerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-      showToast(isRTL ? "تم النشر بنجاح!" : "Publication shared successfully!");
+      showToast(isRTL ? "تم النشر في النادي!" : "Shared with the Club!");
     } catch (e) {
       console.error("Publishing failed", e);
-      alert(isRTL ? "فشل النشر، يرجى التحقق من الاتصال" : "Publishing failed, please check connection");
+      alert(isRTL ? "فشل النشر" : "Cloud Sync Failed");
     } finally {
       setIsPublishing(false);
     }
-  };
-
-  const handleRefresh = () => {
-    setIsRefreshing(true);
-    setTimeout(() => {
-      setIsRefreshing(false);
-      setPullDistance(0);
-    }, 800);
   };
 
   const onTouchStart = (e: React.TouchEvent) => {
@@ -99,15 +99,17 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
     if (diff > 0 && containerRef.current && containerRef.current.scrollTop <= 0) {
       const resistedDiff = Math.min(diff * 0.4, 150);
       setPullDistance(resistedDiff);
-      if (resistedDiff > 10 && e.cancelable) {
-        e.preventDefault();
-      }
+      if (resistedDiff > 10 && e.cancelable) e.preventDefault();
     }
   };
 
   const onTouchEnd = () => {
     if (pullDistance >= refreshThreshold) {
-      handleRefresh();
+      setIsRefreshing(true);
+      setTimeout(() => {
+        setIsRefreshing(false);
+        setPullDistance(0);
+      }, 1000);
     } else {
       setPullDistance(0);
     }
@@ -117,17 +119,18 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
   return (
     <div className="relative h-full w-full overflow-hidden bg-zinc-950">
       {toastMsg && (
-        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 bg-pink-600 text-white rounded-full text-xs font-black uppercase tracking-widest shadow-2xl animate-in fade-in slide-in-from-top-4 duration-300">
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 bg-pink-600 text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-2xl animate-in fade-in slide-in-from-top-4 duration-300">
            {toastMsg}
         </div>
       )}
 
+      {/* Pull Down Indicator */}
       <div 
         className="absolute top-0 left-0 right-0 flex items-center justify-center z-40 pointer-events-none transition-all duration-200"
         style={{ height: `${pullDistance}px`, opacity: pullDistance / refreshThreshold }}
       >
-        <div className={`w-10 h-10 rounded-full bg-zinc-900 border border-pink-500/30 shadow-[0_0_20px_rgba(236,72,153,0.2)] flex items-center justify-center transition-transform ${isRefreshing ? 'animate-spin' : ''}`}>
-          <i className={`fa-solid ${isRefreshing ? 'fa-circle-notch' : 'fa-arrow-down'} text-pink-500 text-sm transition-transform`} style={{ transform: `rotate(${Math.min(pullDistance * 2, 180)}deg)` }}></i>
+        <div className="w-8 h-8 rounded-full bg-zinc-900 border border-pink-500/30 flex items-center justify-center">
+          <i className={`fa-solid ${isRefreshing ? 'fa-circle-notch animate-spin' : 'fa-arrow-down'} text-pink-500 text-[10px]`}></i>
         </div>
       </div>
 
@@ -136,35 +139,48 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
-        className="h-full w-full overflow-y-auto pb-32 hide-scrollbar px-3 lg:px-6 transition-transform duration-200"
+        className="h-full w-full overflow-y-auto pb-40 hide-scrollbar transition-transform duration-200"
         style={{ transform: `translateY(${pullDistance}px)` }}
       >
-        <div className="max-w-3xl mx-auto space-y-6 pt-6">
-          <div className={`flex items-center justify-between px-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
-            <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter flex items-center gap-3">
-              {isRTL ? 'خلاصة النخبة' : 'Elite Feed'}
-              <div className="flex gap-1 items-center">
-                 <div className={`w-2 h-2 rounded-full ${isRefreshing ? 'bg-cyan-500 animate-ping' : 'bg-pink-500 animate-pulse'} shadow-[0_0_10px_rgba(236,72,153,0.8)]`}></div>
-                 <span className="text-[9px] text-pink-500 font-black tracking-widest uppercase">
-                   {isRefreshing ? (isRTL ? 'تحديث...' : 'Syncing...') : (isRTL ? 'بث مباشر' : 'Live Global')}
-                 </span>
+        <div className="max-w-3xl mx-auto pt-6 space-y-6 px-4">
+          
+          {/* Header & Activity Pulse */}
+          <div className={`flex items-center justify-between px-1 ${isRTL ? 'flex-row-reverse' : ''}`}>
+            <div>
+              <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter">Elite Feed</h2>
+              <div className={`flex items-center gap-2 mt-1 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                 <div className="w-1.5 h-1.5 rounded-full bg-pink-500 animate-pulse"></div>
+                 <span className="text-[9px] text-zinc-500 font-black uppercase tracking-[0.2em]">Live Global Stream</span>
               </div>
-            </h2>
-            <button 
-              onClick={handleRefresh}
-              className={`w-10 h-10 rounded-xl bg-white/5 border border-white/5 flex items-center justify-center text-zinc-500 hover:text-white transition-all ${isRefreshing ? 'animate-spin text-pink-500' : ''}`}
-            >
-              <i className="fa-solid fa-rotate"></i>
+            </div>
+            <button className="w-12 h-12 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-center text-zinc-400 hover:text-white transition-all">
+              <i className="fa-solid fa-bolt-lightning text-xs"></i>
             </button>
           </div>
 
-          {/* Create Post Section */}
-          <div className="glass-panel p-6 lg:p-10 rounded-[2.5rem] border-white/5 shadow-2xl bg-gradient-to-br from-zinc-900/40 to-transparent">
-            <div className={`flex gap-4 mb-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
-              <img src={user.avatar || `https://ui-avatars.com/api/?name=${user.name}&background=f472b6&color=fff`} className="w-14 h-14 rounded-2xl shadow-xl border border-white/5" alt="avatar" />
+          {/* Featured Creators Bar */}
+          <div className="w-full overflow-x-auto hide-scrollbar pb-2">
+            <div className={`flex gap-5 min-w-max px-1 ${isRTL ? 'flex-row-reverse' : ''}`}>
+              {FEATURED_CREATORS.map((creator, i) => (
+                <div key={i} className="flex flex-col items-center gap-2 group cursor-pointer">
+                  <div className={`p-1 rounded-[1.8rem] border-2 transition-all group-hover:scale-105 ${creator.live ? 'border-pink-500' : 'border-zinc-800'}`}>
+                    <div className="w-16 h-16 rounded-[1.5rem] overflow-hidden border-2 border-zinc-950">
+                      <img src={creator.avatar} className="w-full h-full object-cover" alt={creator.name} />
+                    </div>
+                  </div>
+                  <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">{creator.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Create Post Studio */}
+          <div className="glass-panel p-6 lg:p-8 rounded-[2.5rem] border-white/5 bg-gradient-to-br from-zinc-900/40 to-black/20 relative group/studio">
+            <div className={`flex gap-4 mb-6 ${isRTL ? 'flex-row-reverse' : ''}`}>
+              <img src={user.avatar || `https://ui-avatars.com/api/?name=${user.name}&background=f472b6&color=fff`} className="w-12 h-12 rounded-2xl shadow-xl border border-white/5 object-cover" alt="avatar" />
               <textarea
-                className={`flex-1 bg-black/40 border border-white/10 rounded-2xl p-5 text-sm text-white placeholder:text-zinc-700 focus:outline-none focus:border-pink-500/40 resize-none transition-all shadow-inner ${isRTL ? 'text-right' : 'text-left'}`}
-                placeholder={isRTL ? 'شارك شيئاً مع النادي...' : 'Share with the club...'} 
+                className={`flex-1 bg-black/40 border border-white/5 rounded-2xl p-4 text-xs text-white placeholder:text-zinc-700 focus:outline-none focus:border-pink-500/20 resize-none transition-all ${isRTL ? 'text-right' : 'text-left'}`}
+                placeholder={isRTL ? 'شارك شيئاً مع النخبة...' : 'Share something exclusive...'} 
                 rows={2} 
                 value={newPostText} 
                 onChange={(e) => setNewPostText(e.target.value)}
@@ -172,7 +188,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
             </div>
 
             {mediaUrl && (
-              <div className="mb-4 relative rounded-3xl overflow-hidden border border-white/10 aspect-video bg-black/60 shadow-inner">
+              <div className="mb-6 relative rounded-[2rem] overflow-hidden border border-white/10 aspect-video bg-black shadow-2xl">
                  {selectedType === 'image' ? (
                    <img src={mediaUrl} className="w-full h-full object-cover" alt="Preview" />
                  ) : (
@@ -184,12 +200,12 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
               </div>
             )}
 
-            <div className={`flex flex-wrap items-center justify-between gap-4 border-t border-white/5 pt-6 ${isRTL ? 'flex-row-reverse' : ''}`}>
-              <div className={`flex gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
+            <div className={`flex items-center justify-between border-t border-white/5 pt-6 ${isRTL ? 'flex-row-reverse' : ''}`}>
+              <div className="flex gap-2">
                 {[
-                  { id: 'text', icon: 'fa-font', label: isRTL ? 'نص' : 'Text' },
-                  { id: 'image', icon: 'fa-image', label: isRTL ? 'صورة' : 'Photo' },
-                  { id: 'video', icon: 'fa-clapperboard', label: isRTL ? 'فيديو' : 'Short' }
+                  { id: 'text', icon: 'fa-font', label: 'TXT' },
+                  { id: 'image', icon: 'fa-image', label: 'IMG' },
+                  { id: 'video', icon: 'fa-clapperboard', label: 'CLIP' }
                 ].map((type) => (
                   <button 
                     key={type.id} 
@@ -197,7 +213,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
                       setSelectedType(type.id as any);
                       if (type.id !== 'text') fileInputRef.current?.click();
                     }} 
-                    className={`flex items-center gap-2 px-5 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${selectedType === type.id ? 'bg-pink-600 text-white shadow-xl shadow-pink-600/30' : 'bg-white/5 text-zinc-500 hover:bg-white/10 border border-white/5'}`}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all ${selectedType === type.id ? 'bg-pink-600 text-white shadow-lg' : 'bg-white/5 text-zinc-500 hover:bg-white/10'}`}
                   >
                     <i className={`fa-solid ${type.icon}`}></i> {type.label}
                   </button>
@@ -214,16 +230,15 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
               <button 
                 onClick={handlePost} 
                 disabled={isPublishing}
-                className="px-12 py-3.5 bg-pink-600 hover:bg-pink-500 disabled:opacity-50 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-2xl shadow-pink-600/40 active:scale-95 group relative overflow-hidden"
+                className="px-8 py-3 bg-pink-600 hover:bg-pink-500 disabled:opacity-50 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-xl active:scale-95"
               >
-                <span className="relative z-10">{isPublishing ? <i className="fa-solid fa-circle-notch animate-spin"></i> : (isRTL ? 'نـشر' : 'PUBLISH')}</span>
-                <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-500 skew-x-[-20deg]"></div>
+                {isPublishing ? <i className="fa-solid fa-circle-notch animate-spin"></i> : (isRTL ? 'نشر' : 'POST')}
               </button>
             </div>
           </div>
 
-          {/* Publications List */}
-          <div className="space-y-8 pb-10">
+          {/* Publications Feed */}
+          <div className="space-y-10 pb-20">
             {publications.map((pub) => (
               <PublicationCard 
                 key={pub.id} 
@@ -235,21 +250,18 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
                     id: Math.random().toString(36).substr(2, 9), 
                     user: user.name, 
                     text, 
-                    timestamp: new Date() 
+                    timestamp: Timestamp.now().toDate() 
                   });
                 }} 
                 isRTL={isRTL} 
                 showToast={showToast}
               />
             ))}
+            
             {publications.length === 0 && !isRefreshing && (
-              <div className="py-24 flex flex-col items-center justify-center opacity-30 text-center space-y-5">
-                 <div className="w-20 h-20 rounded-full border-2 border-dashed border-zinc-800 flex items-center justify-center">
-                   <i className="fa-solid fa-cloud text-pink-500 text-3xl animate-pulse"></i>
-                 </div>
-                 <p className="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-600">
-                   {isRTL ? 'بانتظار وصول البيانات السحابية...' : 'Awaiting Global Cloud Stream...'}
-                 </p>
+              <div className="py-32 flex flex-col items-center justify-center text-center space-y-4 opacity-20">
+                 <i className="fa-solid fa-satellite-dish text-5xl animate-pulse"></i>
+                 <p className="text-[10px] font-black uppercase tracking-[0.4em]">Establishing Secure Feed...</p>
               </div>
             )}
           </div>
@@ -280,139 +292,107 @@ const PublicationCard: React.FC<PublicationCardProps> = ({ pub, onLike, onDislik
 
   const handleShare = async () => {
     const shareData = {
-      title: `My Doll Club - ${pub.user}`,
-      text: pub.description || (pub.type === 'text' ? pub.content : "Check out this elite publication!"),
+      title: 'My Doll Club',
+      text: `Check out this post from ${pub.user}`,
       url: window.location.href,
     };
 
     if (navigator.share) {
       try {
         await navigator.share(shareData);
-        showToast(isRTL ? "تمت المشاركة!" : "Shared successfully!");
-      } catch (err) {
-        console.log("Share cancelled or failed", err);
-      }
+      } catch (err) {}
     } else {
-      try {
-        await navigator.clipboard.writeText(window.location.href);
-        showToast(isRTL ? "تم نسخ الرابط!" : "Link copied to clipboard!");
-      } catch (e) {
-        console.error("Clipboard copy failed", e);
-      }
+      await navigator.clipboard.writeText(window.location.href);
+      showToast(isRTL ? "تم نسخ الرابط" : "Link Copied!");
     }
   };
 
   return (
-    <div className={`glass-panel rounded-[2.5rem] border-white/5 overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-700 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.6)] bg-zinc-900/30 backdrop-blur-xl group relative ${pub.isPending ? 'opacity-70 grayscale-[50%]' : ''}`}>
-      {pub.isPending && (
-        <div className="absolute top-4 right-8 z-20 flex items-center gap-2">
-           <i className="fa-solid fa-circle-notch animate-spin text-pink-500 text-[10px]"></i>
-           <span className="text-[8px] font-black text-pink-500 uppercase tracking-widest">{isRTL ? 'جاري المزامنة...' : 'Syncing...'}</span>
-        </div>
-      )}
+    <div className={`glass-panel rounded-[2.5rem] border-white/5 overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-700 bg-zinc-900/30 backdrop-blur-xl group ${pub.isPending ? 'opacity-70' : ''}`}>
       
-      <div className="p-8 lg:p-10">
-        <div className={`flex items-center justify-between mb-8 ${isRTL ? 'flex-row-reverse' : ''}`}>
-          <div className={`flex items-center gap-5 ${isRTL ? 'flex-row-reverse' : ''}`}>
+      <div className="p-6 lg:p-8">
+        <div className={`flex items-center justify-between mb-6 ${isRTL ? 'flex-row-reverse' : ''}`}>
+          <div className={`flex items-center gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
             <div className="relative">
-              <img src={pub.userAvatar} className="w-14 h-14 rounded-2xl object-cover shadow-2xl border border-white/10" alt="avatar" />
-              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-4 border-zinc-900 rounded-full shadow-lg shadow-emerald-500/30"></div>
+              <img src={pub.userAvatar} className="w-12 h-12 rounded-2xl object-cover shadow-2xl border border-white/10" alt="avatar" />
+              <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-pink-500 border-4 border-zinc-950 rounded-full"></div>
             </div>
             <div className={isRTL ? 'text-right' : 'text-left'}>
-              <p className="text-base font-black text-white leading-none mb-1.5">{pub.user}</p>
-              <div className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                <span className="text-[9px] text-zinc-600 font-black uppercase tracking-widest">
-                  {formatTime(pub.timestamp)}
-                </span>
-                <span className="w-1 h-1 rounded-full bg-zinc-800"></span>
-                <span className="text-[9px] text-pink-500/80 font-black uppercase tracking-widest">{pub.type}</span>
-              </div>
+              <p className="text-sm font-black text-white">{pub.user}</p>
+              <p className="text-[9px] text-zinc-600 font-black uppercase tracking-widest">{formatTime(pub.timestamp)}</p>
             </div>
           </div>
-          <button className="w-12 h-12 rounded-2xl bg-white/5 text-zinc-600 hover:text-white hover:bg-white/10 transition-all border border-white/5">
+          <button className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-zinc-600 hover:text-white transition-all">
             <i className="fa-solid fa-ellipsis"></i>
           </button>
         </div>
 
         {pub.type === 'text' ? (
-          <p className={`text-sm lg:text-lg text-zinc-100 leading-relaxed mb-8 font-medium italic ${isRTL ? 'text-right' : 'text-left'}`}>"{pub.content}"</p>
+          <p className={`text-base lg:text-xl text-zinc-100 leading-relaxed mb-6 font-medium ${isRTL ? 'text-right' : 'text-left'}`}>{pub.content}</p>
         ) : (
-          <div className="space-y-6 mb-8">
+          <div className="space-y-4 mb-6">
              {pub.description && <p className={`text-sm text-zinc-300 font-medium ${isRTL ? 'text-right' : 'text-left'}`}>{pub.description}</p>}
-             <div className="rounded-[2.5rem] overflow-hidden border border-white/10 bg-zinc-950 relative shadow-2xl group/media">
-                <div className="absolute inset-0 bg-pink-600/5 opacity-0 group-hover/media:opacity-100 transition-opacity z-10 pointer-events-none"></div>
+             <div className="rounded-[2rem] overflow-hidden border border-white/5 bg-zinc-950 relative shadow-2xl group/media">
+                <div className="absolute top-4 right-4 z-10 px-3 py-1 bg-black/40 backdrop-blur-md rounded-full border border-white/10 pointer-events-none">
+                  <span className="text-[8px] font-black text-white uppercase tracking-widest">Ultra HD</span>
+                </div>
                 {pub.type === 'image' ? (
-                  <img src={pub.content} className="w-full h-auto object-cover max-h-[700px] transition-transform duration-[2s] group-hover/media:scale-105" alt="post" />
+                  <img src={pub.content} className="w-full h-auto object-cover max-h-[600px] transition-transform duration-[3s] group-hover/media:scale-105" alt="post" />
                 ) : (
-                  <video src={pub.content} className="w-full h-auto object-cover max-h-[700px]" autoPlay muted loop playsInline />
+                  <video src={pub.content} className="w-full h-auto object-cover max-h-[600px]" autoPlay muted loop playsInline />
                 )}
              </div>
           </div>
         )}
 
-        <div className={`flex items-center justify-between pt-8 border-t border-white/5 ${isRTL ? 'flex-row-reverse' : ''}`}>
-          <div className={`flex gap-6 lg:gap-10 ${isRTL ? 'flex-row-reverse' : ''}`}>
-            <button onClick={onLike} className={`flex items-center gap-4 transition-all active:scale-125 group/like ${isRTL ? 'flex-row-reverse' : ''}`}>
-              <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center group-hover/like:bg-pink-500/10 transition-all shadow-xl group-active/like:text-pink-500">
-                <i className="fa-solid fa-heart text-sm text-zinc-500 group-hover/like:text-pink-500"></i>
+        <div className={`flex items-center justify-between pt-6 border-t border-white/5 ${isRTL ? 'flex-row-reverse' : ''}`}>
+          <div className={`flex gap-6 ${isRTL ? 'flex-row-reverse' : ''}`}>
+            <button onClick={onLike} className={`flex items-center gap-2 group/btn active:scale-125 transition-transform ${isRTL ? 'flex-row-reverse' : ''}`}>
+              <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center group-hover/btn:bg-pink-500/10 transition-colors">
+                <i className="fa-solid fa-heart text-xs text-zinc-500 group-hover/btn:text-pink-500"></i>
               </div>
-              <span className="text-[11px] font-black text-zinc-500 group-hover/like:text-white tabular-nums">{pub.likes}</span>
+              <span className="text-[10px] font-black text-zinc-500 tabular-nums">{pub.likes}</span>
             </button>
-            <button onClick={onDislike} className={`flex items-center gap-4 transition-all active:scale-125 group/dislike ${isRTL ? 'flex-row-reverse' : ''}`}>
-              <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center group-hover/dislike:bg-red-500/10 transition-all shadow-xl group-active/dislike:text-red-500">
-                <i className="fa-solid fa-thumbs-down text-sm text-zinc-500 group-hover/dislike:text-red-500"></i>
+            <button onClick={() => setShowComments(!showComments)} className={`flex items-center gap-2 group/btn transition-transform ${isRTL ? 'flex-row-reverse' : ''}`}>
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${showComments ? 'bg-indigo-500/10' : 'bg-white/5'}`}>
+                <i className={`fa-solid fa-comment text-xs ${showComments ? 'text-indigo-400' : 'text-zinc-500'}`}></i>
               </div>
-              <span className="text-[11px] font-black text-zinc-500 group-hover/dislike:text-white tabular-nums">{pub.dislikes}</span>
-            </button>
-            <button onClick={() => setShowComments(!showComments)} className={`flex items-center gap-4 transition-all active:scale-95 group/comm ${showComments ? 'text-indigo-400' : 'text-zinc-500'} ${isRTL ? 'flex-row-reverse' : ''}`}>
-              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-xl transition-all ${showComments ? 'bg-indigo-500/10' : 'bg-white/5'}`}>
-                <i className="fa-solid fa-comment text-sm"></i>
-              </div>
-              <span className="text-[11px] font-black group-hover/comm:text-white tabular-nums">{pub.comments?.length || 0}</span>
+              <span className="text-[10px] font-black text-zinc-500 tabular-nums">{pub.comments?.length || 0}</span>
             </button>
           </div>
-          <button onClick={handleShare} className="flex items-center gap-3 text-zinc-700 hover:text-white transition-all active:scale-90 group/share">
-             <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center shadow-xl border border-white/5 group-hover/share:bg-white/10 group-hover/share:border-pink-500/30">
-                <i className="fa-solid fa-share-nodes text-sm"></i>
-             </div>
+          <button onClick={handleShare} className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-zinc-600 hover:text-white">
+             <i className="fa-solid fa-share-nodes text-xs"></i>
           </button>
         </div>
       </div>
 
       {showComments && (
-        <div className="bg-black/40 p-8 lg:p-10 border-t border-white/5 space-y-8 animate-in slide-in-from-top-6 duration-500">
-          <div className="space-y-6 max-h-96 overflow-y-auto hide-scrollbar px-2">
-            {pub.comments?.sort((a,b) => {
-               const timeA = a.timestamp instanceof Date ? a.timestamp.getTime() : (a.timestamp as any).toMillis?.() || 0;
-               const timeB = b.timestamp instanceof Date ? b.timestamp.getTime() : (b.timestamp as any).toMillis?.() || 0;
-               return timeB - timeA;
-            }).map(c => (
-              <div key={c.id} className={`flex gap-5 animate-in fade-in slide-in-from-left-4 duration-400 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                <img src={`https://ui-avatars.com/api/?name=${c.user}&background=333&color=fff`} className="w-10 h-10 rounded-xl shrink-0 shadow-xl" alt="avatar" />
-                <div className={`flex-1 bg-zinc-900/60 rounded-3xl p-5 border border-white/5 shadow-inner ${isRTL ? 'text-right' : 'text-left'}`}>
-                   <div className={`flex justify-between items-center mb-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                      <p className="text-[10px] font-black text-white uppercase tracking-widest">{c.user}</p>
-                      <span className="text-[9px] text-zinc-700 font-bold uppercase">{formatTime(c.timestamp)}</span>
-                   </div>
-                   <p className="text-xs text-zinc-400 leading-relaxed font-medium">{c.text}</p>
+        <div className="bg-black/40 p-6 lg:p-8 border-t border-white/5 space-y-6 animate-in slide-in-from-top-4">
+          <div className="space-y-4 max-h-80 overflow-y-auto hide-scrollbar">
+            {pub.comments?.map(c => (
+              <div key={c.id} className={`flex gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                <img src={`https://ui-avatars.com/api/?name=${c.user}&background=333&color=fff`} className="w-8 h-8 rounded-lg shrink-0" alt="avatar" />
+                <div className={`flex-1 bg-zinc-900/60 rounded-2xl p-4 border border-white/5 ${isRTL ? 'text-right' : 'text-left'}`}>
+                   <p className="text-[9px] font-black text-white uppercase tracking-widest mb-1">{c.user}</p>
+                   <p className="text-xs text-zinc-400 font-medium">{c.text}</p>
                 </div>
               </div>
             ))}
           </div>
-          <div className={`flex gap-4 pt-8 border-t border-white/5 ${isRTL ? 'flex-row-reverse' : ''}`}>
+          <div className={`flex gap-3 pt-6 border-t border-white/5 ${isRTL ? 'flex-row-reverse' : ''}`}>
             <input 
               type="text" 
-              placeholder={isRTL ? 'أضف تعليقك هنا...' : 'Add to the conversation...'} 
+              placeholder={isRTL ? 'أضف تعليق...' : 'Add a comment...'} 
               value={commentText} 
               onChange={(e) => setCommentText(e.target.value)}
-              className={`flex-1 bg-black/60 border border-white/5 rounded-2xl px-6 py-4 text-xs text-white focus:outline-none focus:border-pink-500/30 transition-all shadow-inner ${isRTL ? 'text-right' : 'text-left'}`}
+              className={`flex-1 bg-black/40 border border-white/5 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-pink-500/20 transition-all ${isRTL ? 'text-right' : 'text-left'}`}
               onKeyDown={(e) => { if (e.key === 'Enter') { onComment(commentText); setCommentText(''); } }}
             />
             <button 
               onClick={() => { onComment(commentText); setCommentText(''); }} 
-              className="w-14 h-14 rounded-2xl bg-pink-600 flex items-center justify-center text-white shadow-2xl shadow-pink-600/30 hover:bg-pink-500 transition-all active:scale-90"
+              className="w-10 h-10 rounded-xl bg-pink-600 flex items-center justify-center text-white"
             >
-              <i className={`fa-solid fa-paper-plane text-xs ${isRTL ? 'rotate-180' : ''}`}></i>
+              <i className={`fa-solid fa-paper-plane text-[10px] ${isRTL ? 'rotate-180' : ''}`}></i>
             </button>
           </div>
         </div>
