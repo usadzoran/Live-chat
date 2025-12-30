@@ -3,7 +3,7 @@ import { initializeApp, getApp, getApps, FirebaseApp } from 'firebase/app';
 import { 
   getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, orderBy, 
   getDocs, onSnapshot, deleteDoc, increment, arrayUnion, Timestamp, limit, 
-  enableNetwork, where, Firestore, writeBatch
+  enableNetwork, where, Firestore, writeBatch, serverTimestamp
 } from 'firebase/firestore';
 import { getAuth, onAuthStateChanged, signInAnonymously, signOut, Auth } from 'firebase/auth';
 import { WithdrawalRecord, Publication, ViewType, Comment } from '../types';
@@ -171,17 +171,29 @@ class DatabaseService {
   
   subscribeToFeed(callback: (pubs: Publication[]) => void) {
     if (!db_fs) return () => {};
+    // Use orderBy with serverTimestamp for consistent results
     const q = query(collection(db_fs, 'publications'), orderBy('timestamp', 'desc'), limit(50));
+    
     return onSnapshot(q, (snap) => {
       const pubs = snap.docs.map(d => {
         const data = d.data();
+        // Handle cases where timestamp might be null during local pending updates
+        let ts: Date;
+        if (data.timestamp && typeof (data.timestamp as any).toDate === 'function') {
+          ts = (data.timestamp as Timestamp).toDate();
+        } else {
+          ts = new Date(); // Fallback for latency compensation
+        }
+
         return { 
           ...data, 
           id: d.id,
-          timestamp: (data.timestamp as Timestamp)?.toDate() || new Date() 
+          timestamp: ts
         } as Publication;
       });
       callback(pubs);
+    }, (error) => {
+      console.error("Firestore feed subscription error:", error);
     });
   }
 
@@ -191,7 +203,7 @@ class DatabaseService {
     await setDoc(pubRef, { 
       ...pub, 
       id: pubRef.id, 
-      timestamp: Timestamp.now(),
+      timestamp: serverTimestamp(),
       likes: 0,
       dislikes: 0,
       comments: []
@@ -217,7 +229,7 @@ class DatabaseService {
     await updateDoc(doc(db_fs, 'publications', pubId), {
       comments: arrayUnion({
         ...comment,
-        timestamp: new Date() // Store as JS Date, Firestore will convert to Timestamp
+        timestamp: new Date() 
       })
     });
   }

@@ -16,13 +16,22 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
   const [isPublishing, setIsPublishing] = useState(false);
   const { t, isRTL } = useTranslation();
   
+  // Pull to Refresh States
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isPulling, setIsPulling] = useState(false);
+  const startY = useRef(0);
+  const refreshThreshold = 80;
+  
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Real-time Firestore Subscription: Updates UI for EVERYONE automatically
+  // Real-time Firestore Subscription: Ensures data is always fresh without manual reloads
   useEffect(() => {
     const unsubscribe = db.subscribeToFeed((newPubs) => {
       setPublications(newPubs);
+      setIsRefreshing(false);
+      setPullDistance(0);
     });
     return () => unsubscribe();
   }, []);
@@ -55,40 +64,83 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
     }
   };
 
-  const handleLike = async (pubId: string) => {
-    await db.likePublication(pubId);
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    // Data is real-time via subscription, but we simulate visual feedback
+    setTimeout(() => {
+      setIsRefreshing(false);
+      setPullDistance(0);
+    }, 800);
   };
 
-  const handleDislike = async (pubId: string) => {
-    await db.dislikePublication(pubId);
+  // Pull to Refresh Handlers
+  const onTouchStart = (e: React.TouchEvent) => {
+    if (containerRef.current && containerRef.current.scrollTop <= 0) {
+      startY.current = e.touches[0].pageY;
+      setIsPulling(true);
+    }
   };
 
-  const handleAddComment = async (pubId: string, text: string) => {
-    if (!text.trim()) return;
-    const newComment: Comment = { 
-      id: Math.random().toString(36).substr(2, 9), 
-      user: user.name, 
-      text, 
-      timestamp: new Date() 
-    };
-    await db.addCommentToPublication(pubId, newComment);
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (!isPulling) return;
+    const currentY = e.touches[0].pageY;
+    const diff = currentY - startY.current;
+
+    if (diff > 0 && containerRef.current && containerRef.current.scrollTop <= 0) {
+      const resistedDiff = Math.min(diff * 0.4, 150);
+      setPullDistance(resistedDiff);
+      if (resistedDiff > 10 && e.cancelable) {
+        e.preventDefault();
+      }
+    }
+  };
+
+  const onTouchEnd = () => {
+    if (pullDistance >= refreshThreshold) {
+      handleRefresh();
+    } else {
+      setPullDistance(0);
+    }
+    setIsPulling(false);
   };
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-zinc-950">
+      {/* Pull to Refresh Indicator */}
+      <div 
+        className="absolute top-0 left-0 right-0 flex items-center justify-center z-40 pointer-events-none transition-all duration-200"
+        style={{ height: `${pullDistance}px`, opacity: pullDistance / refreshThreshold }}
+      >
+        <div className={`w-10 h-10 rounded-full bg-zinc-900 border border-pink-500/30 shadow-[0_0_20px_rgba(236,72,153,0.2)] flex items-center justify-center transition-transform ${isRefreshing ? 'animate-spin' : ''}`}>
+          <i className={`fa-solid ${isRefreshing ? 'fa-circle-notch' : 'fa-arrow-down'} text-pink-500 text-sm transition-transform`} style={{ transform: `rotate(${Math.min(pullDistance * 2, 180)}deg)` }}></i>
+        </div>
+      </div>
+
       <div 
         ref={containerRef} 
-        className="h-full w-full overflow-y-auto pb-32 hide-scrollbar px-3 lg:px-6"
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        className="h-full w-full overflow-y-auto pb-32 hide-scrollbar px-3 lg:px-6 transition-transform duration-200"
+        style={{ transform: `translateY(${pullDistance}px)` }}
       >
         <div className="max-w-3xl mx-auto space-y-6 pt-6">
           <div className={`flex items-center justify-between px-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
             <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter flex items-center gap-3">
               {isRTL ? 'خلاصة النخبة' : 'Elite Feed'}
               <div className="flex gap-1 items-center">
-                 <div className="w-2 h-2 rounded-full bg-pink-500 animate-pulse shadow-[0_0_10px_rgba(236,72,153,0.8)]"></div>
-                 <span className="text-[9px] text-pink-500 font-black tracking-widest uppercase">Live Global</span>
+                 <div className={`w-2 h-2 rounded-full ${isRefreshing ? 'bg-cyan-500 animate-ping' : 'bg-pink-500 animate-pulse'} shadow-[0_0_10px_rgba(236,72,153,0.8)]`}></div>
+                 <span className="text-[9px] text-pink-500 font-black tracking-widest uppercase">
+                   {isRefreshing ? (isRTL ? 'تحديث...' : 'Syncing...') : (isRTL ? 'بث مباشر' : 'Live Global')}
+                 </span>
               </div>
             </h2>
+            <button 
+              onClick={handleRefresh}
+              className={`w-10 h-10 rounded-xl bg-white/5 border border-white/5 flex items-center justify-center text-zinc-500 hover:text-white transition-all ${isRefreshing ? 'animate-spin text-pink-500' : ''}`}
+            >
+              <i className="fa-solid fa-rotate"></i>
+            </button>
           </div>
 
           {/* Create Post Section */}
@@ -161,13 +213,21 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
               <PublicationCard 
                 key={pub.id} 
                 pub={pub} 
-                onLike={() => handleLike(pub.id)} 
-                onDislike={() => handleDislike(pub.id)}
-                onComment={(text) => handleAddComment(pub.id, text)} 
+                onLike={() => db.likePublication(pub.id)} 
+                onDislike={() => db.dislikePublication(pub.id)}
+                onComment={(text) => {
+                  const newComment: Comment = { 
+                    id: Math.random().toString(36).substr(2, 9), 
+                    user: user.name, 
+                    text, 
+                    timestamp: new Date() 
+                  };
+                  db.addCommentToPublication(pub.id, newComment);
+                }} 
                 isRTL={isRTL} 
               />
             ))}
-            {publications.length === 0 && (
+            {publications.length === 0 && !isRefreshing && (
               <div className="py-24 flex flex-col items-center justify-center opacity-30 text-center space-y-5">
                  <div className="w-20 h-20 rounded-full border-2 border-dashed border-zinc-800 flex items-center justify-center">
                    <i className="fa-solid fa-cloud text-pink-500 text-3xl animate-pulse"></i>
@@ -208,7 +268,9 @@ const PublicationCard: React.FC<PublicationCardProps> = ({ pub, onLike, onDislik
             <div className={isRTL ? 'text-right' : 'text-left'}>
               <p className="text-base font-black text-white leading-none mb-1.5">{pub.user}</p>
               <div className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                <span className="text-[9px] text-zinc-600 font-black uppercase tracking-widest">{new Date(pub.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                <span className="text-[9px] text-zinc-600 font-black uppercase tracking-widest">
+                  {pub.timestamp instanceof Date ? pub.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}
+                </span>
                 <span className="w-1 h-1 rounded-full bg-zinc-800"></span>
                 <span className="text-[9px] text-pink-500/80 font-black uppercase tracking-widest">{pub.type}</span>
               </div>
