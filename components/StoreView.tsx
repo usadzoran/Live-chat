@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
-import { db, UserDB } from '../services/databaseService';
+import { api, UserDB } from '../services/databaseService';
 
 interface StoreViewProps {
   user: UserDB;
@@ -44,9 +43,9 @@ const StoreView: React.FC<StoreViewProps> = ({ user, onPurchaseSuccess, onBack }
     setLogs([...newLogs]);
 
     // Secure server-side capture simulation
-    const result = await db.capturePaypalOrder(
+    const result = await api.capturePaypalOrder(
       data.orderID,
-      user.email,
+      user.uid,
       selectedPack!.amount,
       selectedPack!.price
     );

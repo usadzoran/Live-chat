@@ -11,7 +11,7 @@ import AdminDashboard from './components/AdminDashboard';
 import StoreView from './components/StoreView';
 import BottomNav from './components/BottomNav';
 import { ViewType } from './types';
-import { db, UserDB, auth } from './services/databaseService';
+import { api, UserDB, auth } from './services/databaseService';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 
@@ -27,7 +27,7 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        const u = await db.getUser(firebaseUser.uid);
+        const u = await api.getUser(firebaseUser.uid);
         if (u) {
           setUser(u);
           setIsAuthenticated(true);
@@ -41,7 +41,7 @@ const AppContent: React.FC = () => {
         setUser(null);
         setIsAdmin(false);
       }
-      const rev = await db.getPlatformRevenue();
+      const rev = await api.getPlatformRevenue();
       setPlatformRevenue(rev);
       setTimeout(() => setIsInitializing(false), 1500);
     });
@@ -50,7 +50,7 @@ const AppContent: React.FC = () => {
 
   useEffect(() => {
     if (isAuthenticated && user) {
-      db.updateViewPreference(user.uid, currentView);
+      api.updateViewPreference(user.uid, currentView);
     }
   }, [currentView, isAuthenticated, user]);
 
@@ -63,9 +63,9 @@ const AppContent: React.FC = () => {
       const cred = await signInAnonymously(auth);
       const uid = cred.user.uid;
       
-      let u = await db.getUser(uid);
+      let u = await api.getUser(uid);
       if (!u) {
-        u = await db.upsertUser({ 
+        u = await api.upsertUser({ 
           uid,
           name, 
           email, 
@@ -90,7 +90,7 @@ const AppContent: React.FC = () => {
   };
 
   const handleLogout = async () => {
-    await db.logout();
+    await api.logout();
     setIsAuthenticated(false);
     setIsAdmin(false);
     setUser(null);
@@ -142,7 +142,7 @@ const AppContent: React.FC = () => {
           {currentView === 'store' && user && (
             <StoreView 
               user={user} 
-              onPurchaseSuccess={() => db.getUser(user.uid).then(setUser)} 
+              onPurchaseSuccess={() => api.getUser(user.uid).then(setUser)} 
               onBack={() => setCurrentView('feed')} 
             />
           )}

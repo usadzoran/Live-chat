@@ -1,12 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import StreamView from './StreamView';
 import ChatPanel from './ChatPanel';
 import ControlBar from './ControlBar';
 import { StreamStatus, ChatMessage, Gift } from '../types';
 import { GeminiLiveService } from '../services/geminiLiveService';
-// Import UserDB from databaseService instead of types to fix the compilation error
-import { db, UserDB } from '../services/databaseService';
+import { api, UserDB } from '../services/databaseService';
 
 interface LiveBroadcasterViewProps {
   user?: UserDB;
@@ -25,7 +23,7 @@ const LiveBroadcasterView: React.FC<LiveBroadcasterViewProps> = ({ user }) => {
   useEffect(() => {
     return () => {
       service.disconnect();
-      if (user) db.endLiveSession(user.uid);
+      if (user) api.endLiveSession(user.uid);
     };
   }, [service, user]);
 
@@ -36,7 +34,7 @@ const LiveBroadcasterView: React.FC<LiveBroadcasterViewProps> = ({ user }) => {
         onOpen: async () => {
           setStatus(StreamStatus.LIVE);
           if (user) {
-            await db.startLiveSession({
+            await api.startLiveSession({
               uid: user.uid,
               userName: user.name,
               userAvatar: user.avatar || '',
@@ -48,11 +46,11 @@ const LiveBroadcasterView: React.FC<LiveBroadcasterViewProps> = ({ user }) => {
         },
         onClose: () => {
           setStatus(StreamStatus.IDLE);
-          if (user) db.endLiveSession(user.uid);
+          if (user) api.endLiveSession(user.uid);
         },
         onError: () => {
           setStatus(StreamStatus.IDLE);
-          if (user) db.endLiveSession(user.uid);
+          if (user) api.endLiveSession(user.uid);
         },
         onTranscription: (sender, text) => {
           setMessages(prev => [...prev, {
@@ -72,7 +70,7 @@ const LiveBroadcasterView: React.FC<LiveBroadcasterViewProps> = ({ user }) => {
   const handleStop = () => {
     service.disconnect();
     setStatus(StreamStatus.IDLE);
-    if (user) db.endLiveSession(user.uid);
+    if (user) api.endLiveSession(user.uid);
   };
 
   const handleSendGift = (gift: Gift) => {

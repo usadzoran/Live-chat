@@ -1,7 +1,6 @@
-
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef } from 'react';
 import { ViewType, WithdrawalRecord } from '../types';
-import { db, UserDB, MIN_WITHDRAW_GEMS, GEMS_PER_DOLLAR } from '../services/databaseService';
+import { api, UserDB, MIN_WITHDRAW_GEMS, GEMS_PER_DOLLAR } from '../services/databaseService';
 import { Timestamp } from 'firebase/firestore';
 
 interface ProfileViewProps {
@@ -79,7 +78,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
     const updatedUser = { ...formData, album: updatedAlbum };
     
     try {
-      const result = await db.upsertUser(updatedUser);
+      const result = await api.upsertUser(updatedUser);
       setFormData(result);
       onUpdate(result);
       setShowAlbumModal(false);
@@ -99,7 +98,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
     const updatedUser = { ...formData, album: updatedAlbum };
     
     try {
-      const result = await db.upsertUser(updatedUser);
+      const result = await api.upsertUser(updatedUser);
       setFormData(result);
       onUpdate(result);
       showToast("Photo removed", "success");
@@ -111,7 +110,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
   const saveProfileSettings = async () => {
     setIsProcessing(true);
     try {
-      const result = await db.upsertUser(formData);
+      const result = await api.upsertUser(formData);
       setFormData(result);
       onUpdate(result);
       setIsEditing(false);

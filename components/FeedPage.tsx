@@ -1,7 +1,6 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Publication, Comment } from '../types';
-import { db } from '../services/databaseService';
+import { api } from '../services/databaseService';
 import { useTranslation } from '../contexts/LanguageContext';
 import { Timestamp } from 'firebase/firestore';
 
@@ -41,7 +40,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const unsubscribe = db.subscribeToFeed((newPubs) => {
+    const unsubscribe = api.subscribeToFeed((newPubs) => {
       setPublications(newPubs);
       setIsRefreshing(false);
       setPullDistance(0);
@@ -60,7 +59,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
 
     setIsPublishing(true);
     try {
-      await db.addPublication({
+      await api.addPublication({
         user: user.name,
         userAvatar: user.avatar || `https://ui-avatars.com/api/?name=${user.name}&background=f472b6&color=fff`,
         type: selectedType,
@@ -243,10 +242,10 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
               <PublicationCard 
                 key={pub.id} 
                 pub={pub} 
-                onLike={() => db.likePublication(pub.id)} 
-                onDislike={() => db.dislikePublication(pub.id)}
+                onLike={() => api.likePublication(pub.id)} 
+                onDislike={() => api.dislikePublication(pub.id)}
                 onComment={(text) => {
-                  db.addCommentToPublication(pub.id, { 
+                  api.addCommentToPublication(pub.id, { 
                     id: Math.random().toString(36).substr(2, 9), 
                     user: user.name, 
                     text, 

@@ -1,5 +1,4 @@
-
-import { initializeApp, getApp, getApps, FirebaseApp } from 'firebase/app';
+import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { 
   getFirestore, 
   doc, 
@@ -11,7 +10,6 @@ import {
   orderBy, 
   getDocs, 
   onSnapshot, 
-  deleteDoc, 
   increment, 
   arrayUnion, 
   Timestamp, 
@@ -21,8 +19,8 @@ import {
   serverTimestamp,
   Firestore
 } from 'firebase/firestore';
-import { getDatabase, ref, set, onValue, remove, Database, push, onDisconnect } from 'firebase/database';
-import { getAuth, signInAnonymously, signOut, Auth } from 'firebase/auth';
+import { getDatabase, ref, set, onValue, remove, Database, onDisconnect } from 'firebase/database';
+import { getAuth, signOut, Auth } from 'firebase/auth';
 import { WithdrawalRecord, Publication, ViewType, Comment, LiveStreamSession } from '../types';
 
 const firebaseConfig = {
@@ -42,9 +40,9 @@ function getFirebaseApp(): FirebaseApp {
 }
 
 export const app = getFirebaseApp();
-export const db_fs: Firestore = getFirestore(app);
-export const database: Database = getDatabase(app);
 export const auth: Auth = getAuth(app);
+export const db: Firestore = getFirestore(app); // Standard naming for Firestore
+export const realtimeDb: Database = getDatabase(app); // Standard naming for RTDB
 
 export const MIN_WITHDRAW_GEMS = 2000; 
 export const GEMS_PER_DOLLAR = 100;
@@ -75,21 +73,24 @@ class DatabaseService {
   async getUser(uid: string): Promise<UserDB | null> {
     if (!uid) return null;
     try {
-      const snap = await getDoc(doc(db_fs, 'users', uid));
+      const snap = await getDoc(doc(db, 'users', uid));
       return snap.exists() ? snap.data() as UserDB : null;
-    } catch (e) { return null; }
+    } catch (e) { 
+      console.error("Error fetching user:", e);
+      return null; 
+    }
   }
 
   async getAllUsers(): Promise<UserDB[]> {
     try {
-      const q = query(collection(db_fs, 'users'), orderBy('joinedAt', 'desc'));
+      const q = query(collection(db, 'users'), orderBy('joinedAt', 'desc'));
       const snap = await getDocs(q);
       return snap.docs.map(d => d.data() as UserDB);
     } catch (e) { return []; }
   }
 
   async upsertUser(user: Partial<UserDB> & { uid: string }): Promise<UserDB> {
-    const userRef = doc(db_fs, 'users', user.uid);
+    const userRef = doc(db, 'users', user.uid);
     try {
       const existing = await this.getUser(user.uid);
       const data = {
@@ -99,17 +100,23 @@ class DatabaseService {
         diamonds: user.diamonds ?? existing?.diamonds ?? 50,
         role: user.role || existing?.role || 'doll',
         lastActiveView: user.lastActiveView || existing?.lastActiveView || 'feed',
-        status: user.status || existing?.status || 'active'
+        status: user.status || existing?.status || 'active',
+        usd_balance: user.usd_balance ?? existing?.usd_balance ?? 0,
+        withdrawals: user.withdrawals || existing?.withdrawals || [],
+        album: user.album || existing?.album || []
       };
       await setDoc(userRef, data, { merge: true });
       return data as UserDB;
-    } catch (e) { throw e; }
+    } catch (e) { 
+      console.error("Upsert user failed:", e);
+      throw e; 
+    }
   }
 
   async updateViewPreference(uid: string, view: ViewType) {
     if (!uid) return;
     try {
-      await updateDoc(doc(db_fs, 'users', uid), { lastActiveView: view });
+      await updateDoc(doc(db, 'users', uid), { lastActiveView: view });
     } catch (e) {}
   }
 
@@ -117,7 +124,7 @@ class DatabaseService {
 
   async getPlatformRevenue(): Promise<number> {
     try {
-      const q = query(collection(db_fs, 'transactions'), where("status", "==", "COMPLETED"));
+      const q = query(collection(db, 'transactions'), where("status", "==", "COMPLETED"));
       const snap = await getDocs(q);
       let total = 0;
       snap.forEach(d => total += (d.data().price || 0));
@@ -148,7 +155,7 @@ class DatabaseService {
   // --- Real-time Presence & Streaming ---
   
   async startLiveSession(session: LiveStreamSession) {
-    const streamRef = ref(database, `active_streams/${session.uid}`);
+    const streamRef = ref(realtimeDb, `active_streams/${session.uid}`);
     await set(streamRef, {
       ...session,
       startedAt: Date.now()
@@ -157,12 +164,12 @@ class DatabaseService {
   }
 
   async endLiveSession(uid: string) {
-    const streamRef = ref(database, `active_streams/${uid}`);
+    const streamRef = ref(realtimeDb, `active_streams/${uid}`);
     await remove(streamRef);
   }
 
   subscribeToActiveStreams(callback: (streams: LiveStreamSession[]) => void) {
-    const streamsRef = ref(database, 'active_streams');
+    const streamsRef = ref(realtimeDb, 'active_streams');
     return onValue(streamsRef, (snapshot) => {
       const data = snapshot.val();
       if (!data) {
@@ -177,7 +184,7 @@ class DatabaseService {
   // --- Firestore Social Operations ---
 
   subscribeToFeed(callback: (pubs: Publication[]) => void) {
-    const q = query(collection(db_fs, 'publications'), orderBy('timestamp', 'desc'), limit(50));
+    const q = query(collection(db, 'publications'), orderBy('timestamp', 'desc'), limit(50));
     return onSnapshot(q, { includeMetadataChanges: true }, (snap) => {
       const pubs = snap.docs.map(d => {
         const data = d.data();
@@ -199,7 +206,7 @@ class DatabaseService {
   }
 
   async addPublication(pub: Omit<Publication, 'id' | 'timestamp'>): Promise<void> {
-    const pubRef = doc(collection(db_fs, 'publications'));
+    const pubRef = doc(collection(db, 'publications'));
     await setDoc(pubRef, { 
       ...pub, 
       id: pubRef.id, 
@@ -211,17 +218,16 @@ class DatabaseService {
   }
 
   async likePublication(pubId: string) {
-    try { await updateDoc(doc(db_fs, 'publications', pubId), { likes: increment(1) }); } catch (e) {}
+    try { await updateDoc(doc(db, 'publications', pubId), { likes: increment(1) }); } catch (e) {}
   }
 
-  // Added dislikePublication method to resolve missing method error in FeedPage.tsx
   async dislikePublication(pubId: string) {
-    try { await updateDoc(doc(db_fs, 'publications', pubId), { dislikes: increment(1) }); } catch (e) {}
+    try { await updateDoc(doc(db, 'publications', pubId), { dislikes: increment(1) }); } catch (e) {}
   }
 
   async addCommentToPublication(pubId: string, comment: Comment) {
     try {
-      await updateDoc(doc(db_fs, 'publications', pubId), {
+      await updateDoc(doc(db, 'publications', pubId), {
         comments: arrayUnion({ ...comment, timestamp: Timestamp.now() })
       });
     } catch (e) {}
@@ -229,9 +235,10 @@ class DatabaseService {
 
   async capturePaypalOrder(orderID: string, uid: string, amount: number, price: number): Promise<{ success: boolean; message: string }> {
     try {
-      const transRef = doc(db_fs, 'transactions', orderID);
+      const transRef = doc(db, 'transactions', orderID);
       await setDoc(transRef, { orderID, userUid: uid, gems: amount, price, status: 'COMPLETED', timestamp: Timestamp.now() });
-      await updateDoc(doc(db_fs, 'users', uid), { diamonds: increment(amount) });
+      const userRef = doc(db, 'users', uid);
+      await updateDoc(userRef, { diamonds: increment(amount) });
       return { success: true, message: "Order Captured." };
     } catch (e: any) { return { success: false, message: e.message }; }
   }
@@ -240,21 +247,22 @@ class DatabaseService {
     try {
       const collections = ['users', 'publications', 'transactions'];
       for (const colName of collections) {
-        const snap = await getDocs(collection(db_fs, colName));
-        const batch = writeBatch(db_fs);
+        const snap = await getDocs(collection(db, colName));
+        const batch = writeBatch(db);
         snap.docs.forEach(d => batch.delete(d.ref));
         await batch.commit();
       }
-      const streamsRef = ref(database, 'active_streams');
+      const streamsRef = ref(realtimeDb, 'active_streams');
       await remove(streamsRef);
       return { success: true, message: "Cloud Wipe Complete." };
     } catch (e: any) { return { success: false, message: e.message }; }
   }
 
   async toggleUserStatus(uid: string): Promise<void> {
+    if (!uid) return;
     const user = await this.getUser(uid);
     if (!user) return;
-    await updateDoc(doc(db_fs, 'users', uid), { status: user.status === 'banned' ? 'active' : 'banned' });
+    await updateDoc(doc(db, 'users', uid), { status: user.status === 'banned' ? 'active' : 'banned' });
   }
 
   async getAllWithdrawals(): Promise<any[]> {
@@ -262,11 +270,11 @@ class DatabaseService {
     const withdrawals: any[] = [];
     users.forEach(u => (u.withdrawals || []).forEach(w => withdrawals.push({ ...w, userName: u.name, userEmail: u.email })));
     return withdrawals.sort((a, b) => {
-      const tA = a.timestamp instanceof Timestamp ? a.timestamp.toMillis() : new Date(a.timestamp).getTime();
-      const tB = b.timestamp instanceof Timestamp ? b.timestamp.toMillis() : new Date(b.timestamp).getTime();
+      const tA = a.timestamp instanceof Timestamp ? a.timestamp.toMillis() : (a.timestamp instanceof Date ? a.timestamp.getTime() : new Date(a.timestamp).getTime());
+      const tB = b.timestamp instanceof Timestamp ? b.timestamp.toMillis() : (b.timestamp instanceof Date ? b.timestamp.getTime() : new Date(b.timestamp).getTime());
       return tB - tA;
     });
   }
 }
 
-export const db = new DatabaseService();
+export const api = new DatabaseService();

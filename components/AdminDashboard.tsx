@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { AdConfig } from '../types';
-import { db, UserDB } from '../services/databaseService';
+import { api, UserDB } from '../services/databaseService';
 
 interface AdminDashboardProps {
   totalRevenue: number;
@@ -21,9 +20,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ totalRevenue }) => {
     setIsLoading(true);
     try {
       const [stats, users, withdrawals] = await Promise.all([
-        db.getPlatformStats(),
-        db.getAllUsers(),
-        db.getAllWithdrawals()
+        api.getPlatformStats(),
+        api.getAllUsers(),
+        api.getAllWithdrawals()
       ]);
       setPlatformStats(stats);
       setAllUsers(users);
@@ -47,7 +46,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ totalRevenue }) => {
     if (!window.confirm("تحذير: أنت على وشك حذف جميع البيانات (المستخدمين، المنشورات، المعاملات) نهائياً! هل أنت متأكد؟")) return;
     
     setIsNuking(true);
-    const res = await db.clearAllData();
+    const res = await api.clearAllData();
     alert(res.message);
     setIsNuking(false);
     refreshData();
@@ -267,7 +266,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ totalRevenue }) => {
                                 </span>
                               </td>
                               <td className="p-8">
-                                <button onClick={() => db.toggleUserStatus(u.email).then(refreshData)} className="p-2 hover:text-white transition-colors">
+                                <button onClick={() => api.toggleUserStatus(u.uid).then(refreshData)} className="p-2 hover:text-white transition-colors">
                                   <i className={`fa-solid ${u.status === 'banned' ? 'fa-user-check text-emerald-500' : 'fa-user-slash text-red-500'}`}></i>
                                 </button>
                               </td>

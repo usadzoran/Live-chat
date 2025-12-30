@@ -1,6 +1,5 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
-import { db, UserDB } from '../services/databaseService';
+import { api, UserDB } from '../services/databaseService';
 import { LiveStreamSession } from '../types';
 
 interface DiscoveryProfile {
@@ -28,13 +27,13 @@ const DiscoveryView: React.FC = () => {
   const [genderFilter, setGenderFilter] = useState<'all' | 'man' | 'woman'>('all');
 
   useEffect(() => {
-    const unsubscribeStreams = db.subscribeToActiveStreams((streams) => {
+    const unsubscribeStreams = api.subscribeToActiveStreams((streams) => {
       setActiveStreams(streams);
     });
 
     const loadUsers = async () => {
       setIsLoading(true);
-      const allUsers = await db.getAllUsers();
+      const allUsers = await api.getAllUsers();
       const discoveryList: DiscoveryProfile[] = allUsers.map(u => ({
         id: u.uid,
         name: u.name,
