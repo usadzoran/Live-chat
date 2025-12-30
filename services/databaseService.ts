@@ -87,7 +87,7 @@ class DatabaseService {
       const data = {
         ...user,
         email: user.email.toLowerCase().trim(),
-        joinedAt: existing?.joinedAt || new Date().toISOString(),
+        joinedAt: existing?.joinedAt || Timestamp.now().toDate().toISOString(),
         diamonds: user.diamonds ?? existing?.diamonds ?? 50,
         role: user.role || existing?.role || 'doll',
         lastActiveView: user.lastActiveView || existing?.lastActiveView || 'feed',
@@ -213,7 +213,7 @@ class DatabaseService {
         } else if (data.timestamp instanceof Date) {
           ts = data.timestamp;
         } else {
-          // Local fallback for immediate feedback
+          // Local fallback for immediate feedback while waiting for server write
           ts = new Date();
         }
 
@@ -238,7 +238,7 @@ class DatabaseService {
       const pubRef = doc(collection(db_fs, 'publications'));
       // Using Timestamp.now() instead of serverTimestamp() 
       // ensures the document is NOT null in the 'orderBy' query,
-      // which allows it to show up immediately in the UI.
+      // which allows it to show up immediately in the UI via latency compensation.
       await setDoc(pubRef, { 
         ...pub, 
         id: pubRef.id, 
@@ -278,7 +278,7 @@ class DatabaseService {
       await updateDoc(doc(db_fs, 'publications', pubId), {
         comments: arrayUnion({
           ...comment,
-          timestamp: new Date() 
+          timestamp: Timestamp.now() 
         })
       });
     } catch (e) {
