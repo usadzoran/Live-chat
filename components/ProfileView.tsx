@@ -2,6 +2,7 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { ViewType, WithdrawalRecord } from '../types';
 import { db, UserDB, MIN_WITHDRAW_GEMS, GEMS_PER_DOLLAR } from '../services/databaseService';
+import { Timestamp } from 'firebase/firestore';
 
 interface ProfileViewProps {
   user: UserDB;
@@ -42,7 +43,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
   };
 
   const handleWithdraw = async () => {
-    // Already implemented logic
+    // Already implemented logic in App/DB
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'avatar' | 'cover' | 'album') => {
@@ -71,10 +72,10 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
       url: photoForm.url,
       caption: photoForm.caption,
       price: photoForm.price,
-      timestamp: new Date().toISOString()
+      timestamp: Timestamp.now()
     };
 
-    const updatedAlbum = [newPhoto, ...formData.album];
+    const updatedAlbum = [newPhoto, ...(formData.album || [])];
     const updatedUser = { ...formData, album: updatedAlbum };
     
     try {
@@ -94,7 +95,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
   const deletePhoto = async (photoId: string) => {
     if (!window.confirm("Delete this photo?")) return;
     
-    const updatedAlbum = formData.album.filter((p: any) => p.id !== photoId);
+    const updatedAlbum = (formData.album || []).filter((p: any) => p.id !== photoId);
     const updatedUser = { ...formData, album: updatedAlbum };
     
     try {
@@ -283,7 +284,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
                    <tbody>
                      {user.withdrawals && user.withdrawals.length > 0 ? user.withdrawals.map((w, i) => (
                        <tr key={i} className="border-b border-white/5 text-zinc-300">
-                         <td className="p-6">{new Date(w.timestamp).toLocaleDateString()}</td>
+                         <td className="p-6">{w.timestamp instanceof Timestamp ? w.timestamp.toDate().toLocaleDateString() : new Date(w.timestamp).toLocaleDateString()}</td>
                          <td className="p-6 text-emerald-400">${w.amountUsd.toFixed(2)}</td>
                          <td className="p-6">
                             <span className="px-2 py-1 rounded bg-emerald-500/10 text-emerald-500">{w.status}</span>
@@ -381,7 +382,6 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate, onBack, onNav
       {/* Withdrawal Modal */}
       {showWithdrawModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-zinc-950/90 backdrop-blur-xl animate-in fade-in duration-300">
-           {/* Re-use existing modal logic from your provided code */}
            <div className="w-full max-w-md glass-panel p-8 rounded-[3rem] border-white/10 shadow-2xl space-y-6 relative overflow-hidden">
               <button onClick={() => setShowWithdrawModal(false)} className="absolute top-6 right-6 text-zinc-600 hover:text-white"><i className="fa-solid fa-xmark text-lg"></i></button>
               
