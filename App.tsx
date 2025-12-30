@@ -21,8 +21,16 @@ const AppContent: React.FC = () => {
   const [showAuth, setShowAuth] = useState(false);
   const [user, setUser] = useState<UserDB | null>(null);
   const [currentView, setCurrentView] = useState<ViewType>('feed');
+  const [isInitializing, setIsInitializing] = useState(true);
   const [platformRevenue, setPlatformRevenue] = useState<number>(0);
   const [pendingReferrer, setPendingReferrer] = useState<string | null>(null);
+
+  // Sync currentView to localStorage whenever it changes
+  useEffect(() => {
+    if (isAuthenticated) {
+      localStorage.setItem('mydoll_active_view', currentView);
+    }
+  }, [currentView, isAuthenticated]);
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -34,6 +42,7 @@ const AppContent: React.FC = () => {
     window.addEventListener('hashchange', handleHashChange);
 
     const init = async () => {
+      setIsInitializing(true);
       const hash = window.location.hash;
       
       // Handle Referral
@@ -49,22 +58,35 @@ const AppContent: React.FC = () => {
 
       // Restore Session
       const savedSession = localStorage.getItem('mydoll_active_user');
+      const savedView = localStorage.getItem('mydoll_active_view') as ViewType;
+
       if (savedSession) {
-        const u = await db.getUser(savedSession);
-        if (u) {
-          setUser(u);
-          setIsAuthenticated(true);
-          
-          // Check Admin Status
-          const isSystemAdmin = u.email === 'admin@mydoll.club' || u.name === 'wahabfresh' || u.role === 'admin';
-          if (isSystemAdmin) {
-            setIsAdmin(true);
-            // If we are admin, stay in admin view unless explicitly navigated away
-            // Or if the hash specifically points to admin portal
-            if (hash === '#/admin-portal' || !hash || hash === '#/') {
-              setCurrentView('admin');
+        try {
+          const u = await db.getUser(savedSession);
+          if (u) {
+            setUser(u);
+            setIsAuthenticated(true);
+            
+            // Restore View
+            if (savedView) {
+              setCurrentView(savedView);
             }
+
+            // Check Admin Status
+            const isSystemAdmin = u.email === 'admin@mydoll.club' || u.name === 'wahabfresh' || u.role === 'admin';
+            if (isSystemAdmin) {
+              setIsAdmin(true);
+              if (hash === '#/admin-portal' || !hash || hash === '#/') {
+                setCurrentView('admin');
+              }
+            }
+          } else {
+            // If user no longer exists in DB, clear local session
+            localStorage.removeItem('mydoll_active_user');
+            localStorage.removeItem('mydoll_active_view');
           }
+        } catch (e) {
+          console.error("Session restoration failed", e);
         }
       }
 
@@ -75,6 +97,9 @@ const AppContent: React.FC = () => {
 
       const rev = await db.getPlatformRevenue();
       setPlatformRevenue(rev);
+      
+      // Artificial slight delay for a smooth professional transition
+      setTimeout(() => setIsInitializing(false), 800);
     };
 
     init();
@@ -91,7 +116,7 @@ const AppContent: React.FC = () => {
       u = await db.upsertUser({ 
         name, 
         email, 
-        diamonds: isAdminUser ? 0 : 50, // Starting at 0 as requested previously for admin
+        diamonds: isAdminUser ? 0 : 50,
         bio: isAdminUser ? "Master Node Administrator" : "Elite member",
         usd_balance: 0,
         withdrawals: [],
@@ -111,7 +136,7 @@ const AppContent: React.FC = () => {
     setUser(u);
     setIsAuthenticated(true);
     localStorage.setItem('mydoll_active_user', email);
-    // Clear hash only if it wasn't the admin portal (to allow refresh logic to work)
+    
     if (window.location.hash !== '#/admin-portal') {
       window.location.hash = '';
     }
@@ -131,6 +156,7 @@ const AppContent: React.FC = () => {
     setCurrentView('feed');
     window.location.hash = '';
     localStorage.removeItem('mydoll_active_user');
+    localStorage.removeItem('mydoll_active_view');
   };
 
   const handlePurchaseSuccess = async () => {
@@ -140,6 +166,24 @@ const AppContent: React.FC = () => {
     setUser(freshUser);
     setPlatformRevenue(freshRev);
   };
+
+  // Professional Loading Screen
+  if (isInitializing) {
+    return (
+      <div className="h-screen w-screen bg-black flex flex-col items-center justify-center gap-6">
+        <div className="relative">
+          <div className="w-20 h-20 rounded-[2rem] stream-gradient animate-pulse flex items-center justify-center shadow-[0_0_50px_rgba(244,114,182,0.3)]">
+            <i className="fa-solid fa-face-grin-stars text-white text-3xl animate-bounce"></i>
+          </div>
+          <div className="absolute inset-0 border-2 border-white/10 rounded-[2.2rem] scale-110 animate-spin duration-[3s]"></div>
+        </div>
+        <div className="text-center">
+          <h2 className="text-white font-black tracking-[0.4em] uppercase text-xs mb-2">My Doll Club</h2>
+          <p className="text-zinc-700 text-[8px] font-black uppercase tracking-[0.6em]">Initializing Elite Session...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     if (showAuth) {
