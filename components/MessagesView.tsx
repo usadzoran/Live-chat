@@ -358,19 +358,7 @@ const MessagesView: React.FC<MessagesViewProps> = ({ currentUser }) => {
                            <i className={`fa-solid ${msg.stickerIcon} text-5xl drop-shadow-[0_0_15px_rgba(99,102,241,0.5)]`}></i>
                         </div>
                       )}
-                      {msg.type === 'voice' && (
-                        <div className={`px-4 py-3 rounded-2xl flex items-center gap-4 border border-white/5 min-w-[200px] ${isMe ? 'bg-indigo-600/20 rounded-tr-none' : 'bg-zinc-800 rounded-tl-none'}`}>
-                           <button className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-all">
-                              <i className="fa-solid fa-play text-[10px] text-white ml-0.5"></i>
-                           </button>
-                           <div className="flex-1 h-6 flex items-center gap-1">
-                              {[1,2,3,4,3,2,4,5,4,3,2].map((h, i) => (
-                                <div key={i} className="flex-1 bg-white/20 rounded-full" style={{ height: `${h * 20}%` }}></div>
-                              ))}
-                           </div>
-                           <span className="text-[10px] font-black text-white/60 font-mono">{formatTime(msg.voiceDuration || 0)}</span>
-                        </div>
-                      )}
+                      {msg.type === 'voice' && <VoiceMessage msg={msg} isMe={isMe} formatTime={formatTime} />}
                       <p className="text-[8px] text-zinc-600 font-bold uppercase tracking-widest px-1">
                         {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </p>
@@ -448,10 +436,15 @@ const MessagesView: React.FC<MessagesViewProps> = ({ currentUser }) => {
                 </button>
                 
                 {isRecording ? (
-                  <div className="flex-1 flex items-center justify-between px-4 text-xs">
+                  <div className="flex-1 flex items-center justify-between px-4 text-xs h-10 bg-red-500/10 rounded-xl animate-pulse">
                      <div className="flex items-center gap-3">
-                        <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
-                        <span className="text-red-400 font-black tracking-widest uppercase">Recording...</span>
+                        <div className="w-2 h-2 rounded-full bg-red-500 animate-ping"></div>
+                        <span className="text-red-500 font-black tracking-widest uppercase text-[10px]">Recording</span>
+                     </div>
+                     <div className="flex gap-0.5 items-center">
+                        {[1,2,3,4,3,2,3,4,3,2].map((h, i) => (
+                          <div key={i} className="w-0.5 bg-red-500 rounded-full" style={{ height: `${20 + Math.random() * 60}%` }}></div>
+                        ))}
                      </div>
                      <span className="font-mono text-white font-black">{formatTime(recordingTime)}</span>
                   </div>
@@ -470,10 +463,10 @@ const MessagesView: React.FC<MessagesViewProps> = ({ currentUser }) => {
                    <button 
                     onMouseDown={startRecording}
                     onMouseUp={stopRecording}
-                    onMouseLeave={stopRecording}
+                    onMouseLeave={isRecording ? stopRecording : undefined}
                     onTouchStart={startRecording}
                     onTouchEnd={stopRecording}
-                    className={`w-10 h-10 rounded-xl transition-all flex items-center justify-center ${isRecording ? 'bg-red-500 text-white shadow-lg shadow-red-500/30 scale-110' : 'bg-white/5 text-zinc-600 hover:text-white'}`}
+                    className={`w-10 h-10 rounded-xl transition-all flex items-center justify-center touch-none select-none ${isRecording ? 'bg-red-500 text-white shadow-lg shadow-red-500/30 scale-125 z-50' : 'bg-white/5 text-zinc-600 hover:text-white'}`}
                   >
                     <i className="fa-solid fa-microphone text-xs"></i>
                   </button>
@@ -497,6 +490,55 @@ const MessagesView: React.FC<MessagesViewProps> = ({ currentUser }) => {
           </div>
         )}
       </div>
+    </div>
+  );
+};
+
+interface VoiceMessageProps {
+  msg: PrivateMessage;
+  isMe: boolean;
+  formatTime: (s: number) => string;
+}
+
+const VoiceMessage: React.FC<VoiceMessageProps> = ({ msg, isMe, formatTime }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const togglePlay = () => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio(msg.voiceUrl);
+      audioRef.current.onended = () => setIsPlaying(false);
+    }
+
+    if (isPlaying) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play();
+    }
+    setIsPlaying(!isPlaying);
+  };
+
+  return (
+    <div className={`px-4 py-3 rounded-2xl flex items-center gap-4 border border-white/5 min-w-[200px] shadow-lg ${isMe ? 'bg-indigo-600/20 rounded-tr-none' : 'bg-zinc-800 rounded-tl-none'}`}>
+      <button 
+        onClick={togglePlay}
+        className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-all text-white active:scale-90"
+      >
+        <i className={`fa-solid ${isPlaying ? 'fa-pause' : 'fa-play'} text-[10px] ${!isPlaying ? 'ml-0.5' : ''}`}></i>
+      </button>
+      <div className="flex-1 h-6 flex items-center gap-1 overflow-hidden">
+        {[1,2,3,4,3,2,4,5,4,3,2,1,2,3,2,1].map((h, i) => (
+          <div 
+            key={i} 
+            className={`flex-1 rounded-full transition-all duration-300 ${isPlaying ? 'animate-pulse' : ''} ${isMe ? 'bg-indigo-400' : 'bg-white/20'}`} 
+            style={{ 
+              height: `${20 + h * 15}%`,
+              opacity: isPlaying ? 1 : 0.6
+            }}
+          ></div>
+        ))}
+      </div>
+      <span className="text-[10px] font-black text-white/60 font-mono tabular-nums">{formatTime(msg.voiceDuration || 0)}</span>
     </div>
   );
 };
