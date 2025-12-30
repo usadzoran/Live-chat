@@ -5,7 +5,7 @@ import {
   getDocs, onSnapshot, deleteDoc, increment, arrayUnion, Timestamp, limit, 
   enableNetwork, where, Firestore, writeBatch, serverTimestamp
 } from 'firebase/firestore';
-import { getAuth, onAuthStateChanged, signInAnonymously, signOut, Auth } from 'firebase/auth';
+import { getAuth, signInAnonymously, signOut, Auth } from 'firebase/auth';
 import { WithdrawalRecord, Publication, ViewType, Comment } from '../types';
 
 const firebaseConfig = {
@@ -182,7 +182,7 @@ class DatabaseService {
         gems: amount,
         price,
         status: 'COMPLETED',
-        timestamp: new Date()
+        timestamp: Timestamp.now()
       });
       const userRef = doc(db_fs, 'users', uid);
       await updateDoc(userRef, { diamonds: increment(amount) });
@@ -212,9 +212,8 @@ class DatabaseService {
           ts = (data.timestamp as Timestamp).toDate();
         } else if (data.timestamp instanceof Date) {
           ts = data.timestamp;
-        } else if (typeof data.timestamp === 'string') {
-          ts = new Date(data.timestamp);
         } else {
+          // Local fallback for immediate feedback
           ts = new Date();
         }
 
@@ -237,12 +236,13 @@ class DatabaseService {
   async addPublication(pub: Omit<Publication, 'id' | 'timestamp'>): Promise<void> {
     try {
       const pubRef = doc(collection(db_fs, 'publications'));
-      // Using new Date() instead of serverTimestamp() to ensure the doc
-      // is NOT null in the orderBy query during local latency compensation.
+      // Using Timestamp.now() instead of serverTimestamp() 
+      // ensures the document is NOT null in the 'orderBy' query,
+      // which allows it to show up immediately in the UI.
       await setDoc(pubRef, { 
         ...pub, 
         id: pubRef.id, 
-        timestamp: new Date(), 
+        timestamp: Timestamp.now(), 
         likes: 0,
         dislikes: 0,
         comments: []
