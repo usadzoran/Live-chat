@@ -1,12 +1,11 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Publication, Comment } from '../types';
-import { GoogleGenAI } from '@google/genai';
 import { db } from '../services/databaseService';
 import { useTranslation } from '../contexts/LanguageContext';
 
 interface FeedPageProps {
-  user: { name: string; avatar?: string; email: string };
+  user: { name: string; avatar?: string; email: string; uid: string };
 }
 
 const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
@@ -14,18 +13,15 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
   const [newPostText, setNewPostText] = useState('');
   const [selectedType, setSelectedType] = useState<'text' | 'image' | 'video'>('text');
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [showNewPostsToast, setShowNewPostsToast] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
   const { t, isRTL } = useTranslation();
   
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Real-time Firestore Subscription for ALL registered users
+  // Real-time Firestore Subscription: Updates UI for EVERYONE automatically
   useEffect(() => {
     const unsubscribe = db.subscribeToFeed((newPubs) => {
-      setError(null);
       setPublications(newPubs);
     });
     return () => unsubscribe();
@@ -35,49 +31,47 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
     if (selectedType === 'text' && !newPostText.trim()) return;
     if (selectedType !== 'text' && !mediaUrl) return;
 
-    const newPub: Publication = {
-      id: '', // Will be set by Firebase
-      user: user.name,
-      userAvatar: user.avatar || `https://ui-avatars.com/api/?name=${user.name}&background=f472b6&color=fff`,
-      type: selectedType,
-      content: selectedType === 'text' ? newPostText : mediaUrl!,
-      description: selectedType !== 'text' ? newPostText : undefined,
-      likes: 0,
-      dislikes: 0,
-      comments: [],
-      timestamp: new Date()
-    };
-    
-    await db.addPublication(newPub);
-    setNewPostText('');
-    setMediaUrl(null);
-    setSelectedType('text');
-    containerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    setIsPublishing(true);
+    try {
+      await db.addPublication({
+        user: user.name,
+        userAvatar: user.avatar || `https://ui-avatars.com/api/?name=${user.name}&background=f472b6&color=fff`,
+        type: selectedType,
+        content: selectedType === 'text' ? newPostText : mediaUrl!,
+        description: selectedType !== 'text' ? newPostText : undefined,
+        likes: 0,
+        dislikes: 0,
+        comments: []
+      });
+      
+      setNewPostText('');
+      setMediaUrl(null);
+      setSelectedType('text');
+      containerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (e) {
+      console.error("Publishing failed", e);
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
-  const handleInteraction = async (pubId: string, action: 'like' | 'dislike') => {
-    const pub = publications.find(p => p.id === pubId);
-    if (!pub) return;
-    const updated = { 
-      ...pub, 
-      likes: action === 'like' ? pub.likes + 1 : pub.likes, 
-      dislikes: action === 'dislike' ? pub.dislikes + 1 : pub.dislikes 
-    };
-    await db.updatePublication(updated);
+  const handleLike = async (pubId: string) => {
+    await db.likePublication(pubId);
   };
 
-  const addComment = async (pubId: string, text: string) => {
+  const handleDislike = async (pubId: string) => {
+    await db.dislikePublication(pubId);
+  };
+
+  const handleAddComment = async (pubId: string, text: string) => {
     if (!text.trim()) return;
-    const pub = publications.find(p => p.id === pubId);
-    if (!pub) return;
     const newComment: Comment = { 
       id: Math.random().toString(36).substr(2, 9), 
       user: user.name, 
       text, 
       timestamp: new Date() 
     };
-    const updated = { ...pub, comments: [...pub.comments, newComment] };
-    await db.updatePublication(updated);
+    await db.addCommentToPublication(pubId, newComment);
   };
 
   return (
@@ -92,7 +86,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
               {isRTL ? 'خلاصة النخبة' : 'Elite Feed'}
               <div className="flex gap-1 items-center">
                  <div className="w-2 h-2 rounded-full bg-pink-500 animate-pulse shadow-[0_0_10px_rgba(236,72,153,0.8)]"></div>
-                 <span className="text-[9px] text-pink-500 font-black tracking-widest uppercase">Live Cloud</span>
+                 <span className="text-[9px] text-pink-500 font-black tracking-widest uppercase">Live Global</span>
               </div>
             </h2>
           </div>
@@ -152,9 +146,10 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
               </div>
               <button 
                 onClick={handlePost} 
-                className="px-12 py-3.5 bg-pink-600 hover:bg-pink-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-2xl shadow-pink-600/40 active:scale-95 group relative overflow-hidden"
+                disabled={isPublishing}
+                className="px-12 py-3.5 bg-pink-600 hover:bg-pink-500 disabled:opacity-50 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-2xl shadow-pink-600/40 active:scale-95 group relative overflow-hidden"
               >
-                <span className="relative z-10">{isRTL ? 'نـشر' : 'PUBLISH'}</span>
+                <span className="relative z-10">{isPublishing ? <i className="fa-solid fa-circle-notch animate-spin"></i> : (isRTL ? 'نـشر' : 'PUBLISH')}</span>
                 <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-500 skew-x-[-20deg]"></div>
               </button>
             </div>
@@ -163,7 +158,14 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
           {/* Publications List */}
           <div className="space-y-8 pb-10">
             {publications.map((pub) => (
-              <PublicationCard key={pub.id} pub={pub} onInteraction={handleInteraction} onComment={addComment} isRTL={isRTL} />
+              <PublicationCard 
+                key={pub.id} 
+                pub={pub} 
+                onLike={() => handleLike(pub.id)} 
+                onDislike={() => handleDislike(pub.id)}
+                onComment={(text) => handleAddComment(pub.id, text)} 
+                isRTL={isRTL} 
+              />
             ))}
             {publications.length === 0 && (
               <div className="py-24 flex flex-col items-center justify-center opacity-30 text-center space-y-5">
@@ -184,12 +186,13 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
 
 interface PublicationCardProps {
   pub: Publication;
-  onInteraction: (id: string, action: 'like' | 'dislike') => void;
-  onComment: (id: string, text: string) => void;
+  onLike: () => void;
+  onDislike: () => void;
+  onComment: (text: string) => void;
   isRTL: boolean;
 }
 
-const PublicationCard: React.FC<PublicationCardProps> = ({ pub, onInteraction, onComment, isRTL }) => {
+const PublicationCard: React.FC<PublicationCardProps> = ({ pub, onLike, onDislike, onComment, isRTL }) => {
   const [commentText, setCommentText] = useState('');
   const [showComments, setShowComments] = useState(false);
 
@@ -234,11 +237,17 @@ const PublicationCard: React.FC<PublicationCardProps> = ({ pub, onInteraction, o
 
         <div className={`flex items-center justify-between pt-8 border-t border-white/5 ${isRTL ? 'flex-row-reverse' : ''}`}>
           <div className={`flex gap-6 lg:gap-10 ${isRTL ? 'flex-row-reverse' : ''}`}>
-            <button onClick={() => onInteraction(pub.id, 'like')} className={`flex items-center gap-4 transition-all active:scale-125 group/like ${isRTL ? 'flex-row-reverse' : ''}`}>
+            <button onClick={onLike} className={`flex items-center gap-4 transition-all active:scale-125 group/like ${isRTL ? 'flex-row-reverse' : ''}`}>
               <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center group-hover/like:bg-pink-500/10 transition-all shadow-xl group-active/like:text-pink-500">
                 <i className="fa-solid fa-heart text-sm text-zinc-500 group-hover/like:text-pink-500"></i>
               </div>
               <span className="text-[11px] font-black text-zinc-500 group-hover/like:text-white tabular-nums">{pub.likes}</span>
+            </button>
+            <button onClick={onDislike} className={`flex items-center gap-4 transition-all active:scale-125 group/dislike ${isRTL ? 'flex-row-reverse' : ''}`}>
+              <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center group-hover/dislike:bg-red-500/10 transition-all shadow-xl group-active/dislike:text-red-500">
+                <i className="fa-solid fa-thumbs-down text-sm text-zinc-500 group-hover/dislike:text-red-500"></i>
+              </div>
+              <span className="text-[11px] font-black text-zinc-500 group-hover/dislike:text-white tabular-nums">{pub.dislikes}</span>
             </button>
             <button onClick={() => setShowComments(!showComments)} className={`flex items-center gap-4 transition-all active:scale-95 group/comm ${showComments ? 'text-indigo-400' : 'text-zinc-500'} ${isRTL ? 'flex-row-reverse' : ''}`}>
               <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-xl transition-all ${showComments ? 'bg-indigo-500/10' : 'bg-white/5'}`}>
@@ -258,7 +267,7 @@ const PublicationCard: React.FC<PublicationCardProps> = ({ pub, onInteraction, o
       {showComments && (
         <div className="bg-black/40 p-8 lg:p-10 border-t border-white/5 space-y-8 animate-in slide-in-from-top-6 duration-500">
           <div className="space-y-6 max-h-96 overflow-y-auto hide-scrollbar px-2">
-            {pub.comments?.map(c => (
+            {pub.comments?.sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).map(c => (
               <div key={c.id} className={`flex gap-5 animate-in fade-in slide-in-from-left-4 duration-400 ${isRTL ? 'flex-row-reverse' : ''}`}>
                 <img src={`https://ui-avatars.com/api/?name=${c.user}&background=333&color=fff`} className="w-10 h-10 rounded-xl shrink-0 shadow-xl" alt="avatar" />
                 <div className={`flex-1 bg-zinc-900/60 rounded-3xl p-5 border border-white/5 shadow-inner ${isRTL ? 'text-right' : 'text-left'}`}>
@@ -278,10 +287,10 @@ const PublicationCard: React.FC<PublicationCardProps> = ({ pub, onInteraction, o
               value={commentText} 
               onChange={(e) => setCommentText(e.target.value)}
               className={`flex-1 bg-black/60 border border-white/5 rounded-2xl px-6 py-4 text-xs text-white focus:outline-none focus:border-pink-500/30 transition-all shadow-inner ${isRTL ? 'text-right' : 'text-left'}`}
-              onKeyDown={(e) => { if (e.key === 'Enter') { onComment(pub.id, commentText); setCommentText(''); } }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { onComment(commentText); setCommentText(''); } }}
             />
             <button 
-              onClick={() => { onComment(pub.id, commentText); setCommentText(''); }} 
+              onClick={() => { onComment(commentText); setCommentText(''); }} 
               className="w-14 h-14 rounded-2xl bg-pink-600 flex items-center justify-center text-white shadow-2xl shadow-pink-600/30 hover:bg-pink-500 transition-all active:scale-90"
             >
               <i className={`fa-solid fa-paper-plane text-xs ${isRTL ? 'rotate-180' : ''}`}></i>

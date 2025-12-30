@@ -31,7 +31,7 @@ export const MIN_WITHDRAW_GEMS = 2000;
 export const GEMS_PER_DOLLAR = 100;
 
 export interface UserDB {
-  uid: string; // Added UID field
+  uid: string;
   name: string;
   email: string;
   diamonds: number;
@@ -53,22 +53,11 @@ export interface UserDB {
 }
 
 class DatabaseService {
-  // Use UID for primary fetching to ensure persistence after refresh
   async getUser(uid: string): Promise<UserDB | null> {
     if (!uid || !db_fs) return null;
     try {
       const snap = await getDoc(doc(db_fs, 'users', uid));
       return snap.exists() ? snap.data() as UserDB : null;
-    } catch (e) { return null; }
-  }
-
-  // Find user by email for login simulation
-  async getUserByEmail(email: string): Promise<UserDB | null> {
-    if (!email || !db_fs) return null;
-    try {
-      const q = query(collection(db_fs, 'users'), where("email", "==", email.toLowerCase().trim()), limit(1));
-      const snap = await getDocs(q);
-      return !snap.empty ? snap.docs[0].data() as UserDB : null;
     } catch (e) { return null; }
   }
 
@@ -106,6 +95,8 @@ class DatabaseService {
     await updateDoc(userRef, { lastActiveView: view });
   }
 
+  async logout() { await signOut(auth); }
+
   async getPlatformRevenue(): Promise<number> {
     if (!db_fs) return 0;
     try {
@@ -117,33 +108,9 @@ class DatabaseService {
     } catch (e) { return 0; }
   }
 
-  async requestWithdrawal(uid: string, paypalEmail: string, gems: number): Promise<{ success: boolean; message: string }> {
-    if (!db_fs) return { success: false, message: "Database not connected" };
-    const user = await this.getUser(uid);
-    if (!user || user.diamonds < gems) return { success: false, message: "Insufficient gems" };
-
-    const withdrawal: WithdrawalRecord = {
-      id: Math.random().toString(36).substr(2, 9),
-      amountUsd: gems / GEMS_PER_DOLLAR,
-      gemsConverted: gems,
-      paypalEmail,
-      status: 'completed',
-      timestamp: new Date()
-    };
-
-    const userRef = doc(db_fs, 'users', uid);
-    await updateDoc(userRef, {
-      diamonds: increment(-gems),
-      withdrawals: arrayUnion(withdrawal)
-    });
-
-    return { success: true, message: "Withdrawal completed successfully!" };
-  }
-
   async getPlatformStats(): Promise<any> {
     const users = await this.getAllUsers();
     const revenue = await this.getPlatformRevenue();
-    
     let totalPayouts = 0;
     let dollCount = 0;
     users.forEach(u => {
@@ -152,7 +119,6 @@ class DatabaseService {
         if (w.status === 'completed') totalPayouts += w.amountUsd;
       });
     });
-
     return {
       revenue,
       totalPayouts,
@@ -160,17 +126,6 @@ class DatabaseService {
       dollCount,
       liabilityUsd: users.reduce((acc, u) => acc + (u.diamonds / GEMS_PER_DOLLAR), 0)
     };
-  }
-
-  async getAllWithdrawals(): Promise<any[]> {
-    const users = await this.getAllUsers();
-    const withdrawals: any[] = [];
-    users.forEach(u => {
-      (u.withdrawals || []).forEach(w => {
-        withdrawals.push({ ...w, userName: u.name, userEmail: u.email });
-      });
-    });
-    return withdrawals.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }
 
   async clearAllData(): Promise<{ success: boolean; message: string }> {
@@ -212,8 +167,8 @@ class DatabaseService {
     } catch (e: any) { return { success: false, message: e.message }; }
   }
 
-  async logout() { await signOut(auth); }
-
+  // --- Real-time Feed Operations ---
+  
   subscribeToFeed(callback: (pubs: Publication[]) => void) {
     if (!db_fs) return () => {};
     const q = query(collection(db_fs, 'publications'), orderBy('timestamp', 'desc'), limit(50));
@@ -230,24 +185,52 @@ class DatabaseService {
     });
   }
 
-  async addPublication(pub: Publication): Promise<void> {
+  async addPublication(pub: Omit<Publication, 'id' | 'timestamp'>): Promise<void> {
     if (!db_fs) return;
     const pubRef = doc(collection(db_fs, 'publications'));
     await setDoc(pubRef, { 
       ...pub, 
       id: pubRef.id, 
-      timestamp: Timestamp.now() 
+      timestamp: Timestamp.now(),
+      likes: 0,
+      dislikes: 0,
+      comments: []
     });
   }
 
-  async updatePublication(pub: Publication): Promise<void> {
+  async likePublication(pubId: string) {
     if (!db_fs) return;
-    const pubRef = doc(db_fs, 'publications', pub.id);
-    await updateDoc(pubRef, {
-      likes: pub.likes,
-      dislikes: pub.dislikes,
-      comments: pub.comments
+    await updateDoc(doc(db_fs, 'publications', pubId), {
+      likes: increment(1)
     });
+  }
+
+  async dislikePublication(pubId: string) {
+    if (!db_fs) return;
+    await updateDoc(doc(db_fs, 'publications', pubId), {
+      dislikes: increment(1)
+    });
+  }
+
+  async addCommentToPublication(pubId: string, comment: Comment) {
+    if (!db_fs) return;
+    await updateDoc(doc(db_fs, 'publications', pubId), {
+      comments: arrayUnion({
+        ...comment,
+        timestamp: new Date() // Store as JS Date, Firestore will convert to Timestamp
+      })
+    });
+  }
+
+  async getAllWithdrawals(): Promise<any[]> {
+    const users = await this.getAllUsers();
+    const withdrawals: any[] = [];
+    users.forEach(u => {
+      (u.withdrawals || []).forEach(w => {
+        withdrawals.push({ ...w, userName: u.name, userEmail: u.email });
+      });
+    });
+    return withdrawals.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }
 }
 
