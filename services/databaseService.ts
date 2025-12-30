@@ -1,13 +1,31 @@
 
 import { initializeApp, getApp, getApps, FirebaseApp } from 'firebase/app';
 import { 
-  getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, orderBy, 
-  getDocs, onSnapshot, deleteDoc, increment, arrayUnion, Timestamp, limit, 
-  where, Firestore, writeBatch, serverTimestamp
+  getFirestore, 
+  doc, 
+  getDoc, 
+  setDoc, 
+  updateDoc, 
+  collection, 
+  query, 
+  orderBy, 
+  getDocs, 
+  onSnapshot, 
+  deleteDoc, 
+  increment, 
+  arrayUnion, 
+  Timestamp, 
+  limit,
+  where, 
+  writeBatch, 
+  serverTimestamp,
+  Firestore
 } from 'firebase/firestore';
+import { getDatabase, Database } from 'firebase/database';
 import { getAuth, signInAnonymously, signOut, Auth } from 'firebase/auth';
 import { WithdrawalRecord, Publication, ViewType, Comment } from '../types';
 
+// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyAKnoCa3sKwZrQaUXy0PNkJ1FbsJGAOyjk",
   authDomain: "studio-3236344976-c8013.firebaseapp.com",
@@ -24,8 +42,9 @@ function getFirebaseApp(): FirebaseApp {
   return initializeApp(firebaseConfig);
 }
 
-const app = getFirebaseApp();
+export const app = getFirebaseApp();
 export const db_fs: Firestore = getFirestore(app);
+export const database: Database = getDatabase(app);
 export const auth: Auth = getAuth(app);
 
 export const MIN_WITHDRAW_GEMS = 2000; 
@@ -167,7 +186,6 @@ class DatabaseService {
 
     const q = query(collection(db_fs, 'publications'), orderBy('timestamp', 'desc'), limit(50));
     
-    // Using includeMetadataChanges: true allows Optimistic UI (instant local update)
     return onSnapshot(q, { includeMetadataChanges: true }, (snap) => {
       const pubs = snap.docs.map(d => {
         const data = d.data();
@@ -176,8 +194,7 @@ class DatabaseService {
         if (data.timestamp && typeof data.timestamp.toDate === 'function') {
           finalTimestamp = data.timestamp.toDate();
         } else {
-          // Fallback for pending writes
-          finalTimestamp = new Date();
+          finalTimestamp = new Date(); // Latency compensation fallback
         }
 
         return { 
@@ -194,7 +211,7 @@ class DatabaseService {
   async addPublication(pub: Omit<Publication, 'id' | 'timestamp'>): Promise<void> {
     try {
       const pubRef = doc(collection(db_fs, 'publications'));
-      // Using Timestamp.now() for the client-side but Firestore replaces serverTimestamp() with precise server time
+      // Using serverTimestamp for server-side accuracy
       await setDoc(pubRef, { 
         ...pub, 
         id: pubRef.id, 
@@ -204,7 +221,7 @@ class DatabaseService {
         comments: [] 
       });
     } catch (err) {
-      console.error("Failed to add publication:", err);
+      console.error("Cloud synchronization failed:", err);
       throw err;
     }
   }
