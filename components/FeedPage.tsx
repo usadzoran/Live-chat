@@ -8,8 +8,13 @@ interface FeedPageProps {
   user: { name: string; avatar?: string; email: string; uid: string };
 }
 
+// Extend Publication type for internal UI state
+interface PublicationWithState extends Publication {
+  isPending?: boolean;
+}
+
 const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
-  const [publications, setPublications] = useState<Publication[]>([]);
+  const [publications, setPublications] = useState<PublicationWithState[]>([]);
   const [newPostText, setNewPostText] = useState('');
   const [selectedType, setSelectedType] = useState<'text' | 'image' | 'video'>('text');
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
@@ -29,7 +34,8 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
   // Real-time Firestore Subscription: Ensures data is always fresh without manual reloads
   useEffect(() => {
     const unsubscribe = db.subscribeToFeed((newPubs) => {
-      setPublications([...newPubs]);
+      // Direct assignment for maximum speed
+      setPublications(newPubs);
       setIsRefreshing(false);
       setPullDistance(0);
     });
@@ -247,7 +253,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
 };
 
 interface PublicationCardProps {
-  pub: Publication;
+  pub: PublicationWithState;
   onLike: () => void;
   onDislike: () => void;
   onComment: (text: string) => void;
@@ -266,7 +272,14 @@ const PublicationCard: React.FC<PublicationCardProps> = ({ pub, onLike, onDislik
   };
 
   return (
-    <div className="glass-panel rounded-[2.5rem] border-white/5 overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-700 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.6)] bg-zinc-900/30 backdrop-blur-xl group">
+    <div className={`glass-panel rounded-[2.5rem] border-white/5 overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-700 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.6)] bg-zinc-900/30 backdrop-blur-xl group relative ${pub.isPending ? 'opacity-70 grayscale-[50%]' : ''}`}>
+      {pub.isPending && (
+        <div className="absolute top-4 right-8 z-20 flex items-center gap-2">
+           <i className="fa-solid fa-circle-notch animate-spin text-pink-500 text-[10px]"></i>
+           <span className="text-[8px] font-black text-pink-500 uppercase tracking-widest">{isRTL ? 'جاري المزامنة...' : 'Syncing...'}</span>
+        </div>
+      )}
+      
       <div className="p-8 lg:p-10">
         <div className={`flex items-center justify-between mb-8 ${isRTL ? 'flex-row-reverse' : ''}`}>
           <div className={`flex items-center gap-5 ${isRTL ? 'flex-row-reverse' : ''}`}>
