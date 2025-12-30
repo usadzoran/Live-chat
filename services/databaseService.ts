@@ -53,7 +53,7 @@ export interface UserDB {
   referralCount?: number;
   status?: 'active' | 'banned';
   role?: 'doll' | 'mentor' | 'admin';
-  joinedAt?: string;
+  joinedAt?: Timestamp;
   lastActiveView?: ViewType;
 }
 
@@ -80,24 +80,24 @@ class DatabaseService {
     }
   }
 
-  async upsertUser(user: UserDB): Promise<UserDB> {
+  async upsertUser(user: Partial<UserDB> & { uid: string }): Promise<UserDB> {
     const userRef = doc(db_fs, 'users', user.uid);
     try {
       const existing = await this.getUser(user.uid);
       const data = {
         ...user,
-        email: user.email.toLowerCase().trim(),
-        joinedAt: existing?.joinedAt || Timestamp.now().toDate().toISOString(),
+        email: user.email?.toLowerCase().trim() || existing?.email || '',
+        joinedAt: existing?.joinedAt || Timestamp.now(),
         diamonds: user.diamonds ?? existing?.diamonds ?? 50,
         role: user.role || existing?.role || 'doll',
         lastActiveView: user.lastActiveView || existing?.lastActiveView || 'feed',
         status: user.status || existing?.status || 'active'
       };
       await setDoc(userRef, data, { merge: true });
-      return data;
+      return data as UserDB;
     } catch (e) { 
       console.error("Error upserting user:", e);
-      return user; 
+      throw e;
     }
   }
 
@@ -213,7 +213,7 @@ class DatabaseService {
         } else if (data.timestamp instanceof Date) {
           ts = data.timestamp;
         } else {
-          // Local fallback for immediate feedback while waiting for server write
+          // Fallback for latency compensation
           ts = new Date();
         }
 
@@ -236,9 +236,6 @@ class DatabaseService {
   async addPublication(pub: Omit<Publication, 'id' | 'timestamp'>): Promise<void> {
     try {
       const pubRef = doc(collection(db_fs, 'publications'));
-      // Using Timestamp.now() instead of serverTimestamp() 
-      // ensures the document is NOT null in the 'orderBy' query,
-      // which allows it to show up immediately in the UI via latency compensation.
       await setDoc(pubRef, { 
         ...pub, 
         id: pubRef.id, 
@@ -295,7 +292,11 @@ class DatabaseService {
           withdrawals.push({ ...w, userName: u.name, userEmail: u.email });
         });
       });
-      return withdrawals.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      return withdrawals.sort((a, b) => {
+        const timeA = a.timestamp instanceof Timestamp ? a.timestamp.toMillis() : new Date(a.timestamp).getTime();
+        const timeB = b.timestamp instanceof Timestamp ? b.timestamp.toMillis() : new Date(b.timestamp).getTime();
+        return timeB - timeA;
+      });
     } catch (e) {
       console.error("Error getting withdrawals:", e);
       return [];

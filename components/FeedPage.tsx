@@ -19,6 +19,7 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
   const [selectedType, setSelectedType] = useState<'text' | 'image' | 'video'>('text');
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
   const { t, isRTL } = useTranslation();
   
   // Pull to Refresh States
@@ -31,16 +32,19 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Real-time Firestore Subscription: Ensures data is always fresh without manual reloads
   useEffect(() => {
     const unsubscribe = db.subscribeToFeed((newPubs) => {
-      // Direct assignment for maximum speed
       setPublications(newPubs);
       setIsRefreshing(false);
       setPullDistance(0);
     });
     return () => unsubscribe();
   }, []);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3000);
+  };
 
   const handlePost = async () => {
     if (selectedType === 'text' && !newPostText.trim()) return;
@@ -62,8 +66,8 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
       setNewPostText('');
       setMediaUrl(null);
       setSelectedType('text');
-      // Scroll to top to see the new post instantly
       containerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+      showToast(isRTL ? "تم النشر بنجاح!" : "Publication shared successfully!");
     } catch (e) {
       console.error("Publishing failed", e);
       alert(isRTL ? "فشل النشر، يرجى التحقق من الاتصال" : "Publishing failed, please check connection");
@@ -74,14 +78,12 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
 
   const handleRefresh = () => {
     setIsRefreshing(true);
-    // Data is real-time via subscription, but we simulate visual feedback to reassure the user
     setTimeout(() => {
       setIsRefreshing(false);
       setPullDistance(0);
     }, 800);
   };
 
-  // Pull to Refresh Handlers
   const onTouchStart = (e: React.TouchEvent) => {
     if (containerRef.current && containerRef.current.scrollTop <= 0) {
       startY.current = e.touches[0].pageY;
@@ -114,7 +116,12 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-zinc-950">
-      {/* Pull to Refresh Indicator */}
+      {toastMsg && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 bg-pink-600 text-white rounded-full text-xs font-black uppercase tracking-widest shadow-2xl animate-in fade-in slide-in-from-top-4 duration-300">
+           {toastMsg}
+        </div>
+      )}
+
       <div 
         className="absolute top-0 left-0 right-0 flex items-center justify-center z-40 pointer-events-none transition-all duration-200"
         style={{ height: `${pullDistance}px`, opacity: pullDistance / refreshThreshold }}
@@ -224,15 +231,15 @@ const FeedPage: React.FC<FeedPageProps> = ({ user }) => {
                 onLike={() => db.likePublication(pub.id)} 
                 onDislike={() => db.dislikePublication(pub.id)}
                 onComment={(text) => {
-                  const newComment: Comment = { 
+                  db.addCommentToPublication(pub.id, { 
                     id: Math.random().toString(36).substr(2, 9), 
                     user: user.name, 
                     text, 
                     timestamp: new Date() 
-                  };
-                  db.addCommentToPublication(pub.id, newComment);
+                  });
                 }} 
                 isRTL={isRTL} 
+                showToast={showToast}
               />
             ))}
             {publications.length === 0 && !isRefreshing && (
@@ -258,13 +265,13 @@ interface PublicationCardProps {
   onDislike: () => void;
   onComment: (text: string) => void;
   isRTL: boolean;
+  showToast: (msg: string) => void;
 }
 
-const PublicationCard: React.FC<PublicationCardProps> = ({ pub, onLike, onDislike, onComment, isRTL }) => {
+const PublicationCard: React.FC<PublicationCardProps> = ({ pub, onLike, onDislike, onComment, isRTL, showToast }) => {
   const [commentText, setCommentText] = useState('');
   const [showComments, setShowComments] = useState(false);
 
-  // Helper to safely format timestamp
   const formatTime = (ts: any) => {
     if (!ts) return '';
     const date = ts instanceof Date ? ts : (typeof ts.toDate === 'function' ? ts.toDate() : new Date(ts));
@@ -272,20 +279,26 @@ const PublicationCard: React.FC<PublicationCardProps> = ({ pub, onLike, onDislik
   };
 
   const handleShare = async () => {
+    const shareData = {
+      title: `My Doll Club - ${pub.user}`,
+      text: pub.description || (pub.type === 'text' ? pub.content : "Check out this elite publication!"),
+      url: window.location.href,
+    };
+
     if (navigator.share) {
       try {
-        await navigator.share({
-          title: `My Doll Club - ${pub.user}`,
-          text: pub.description || pub.content,
-          url: window.location.href,
-        });
+        await navigator.share(shareData);
+        showToast(isRTL ? "تمت المشاركة!" : "Shared successfully!");
       } catch (err) {
         console.log("Share cancelled or failed", err);
       }
     } else {
-      // Fallback: Copy to clipboard
-      navigator.clipboard.writeText(window.location.href);
-      alert(isRTL ? "تم نسخ الرابط!" : "Link copied to clipboard!");
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        showToast(isRTL ? "تم نسخ الرابط!" : "Link copied to clipboard!");
+      } catch (e) {
+        console.error("Clipboard copy failed", e);
+      }
     }
   };
 
@@ -358,8 +371,8 @@ const PublicationCard: React.FC<PublicationCardProps> = ({ pub, onLike, onDislik
               <span className="text-[11px] font-black group-hover/comm:text-white tabular-nums">{pub.comments?.length || 0}</span>
             </button>
           </div>
-          <button onClick={handleShare} className="flex items-center gap-3 text-zinc-700 hover:text-white transition-all active:scale-90">
-             <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center shadow-xl border border-white/5">
+          <button onClick={handleShare} className="flex items-center gap-3 text-zinc-700 hover:text-white transition-all active:scale-90 group/share">
+             <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center shadow-xl border border-white/5 group-hover/share:bg-white/10 group-hover/share:border-pink-500/30">
                 <i className="fa-solid fa-share-nodes text-sm"></i>
              </div>
           </button>
@@ -369,7 +382,11 @@ const PublicationCard: React.FC<PublicationCardProps> = ({ pub, onLike, onDislik
       {showComments && (
         <div className="bg-black/40 p-8 lg:p-10 border-t border-white/5 space-y-8 animate-in slide-in-from-top-6 duration-500">
           <div className="space-y-6 max-h-96 overflow-y-auto hide-scrollbar px-2">
-            {pub.comments?.sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).map(c => (
+            {pub.comments?.sort((a,b) => {
+               const timeA = a.timestamp instanceof Date ? a.timestamp.getTime() : (a.timestamp as any).toMillis?.() || 0;
+               const timeB = b.timestamp instanceof Date ? b.timestamp.getTime() : (b.timestamp as any).toMillis?.() || 0;
+               return timeB - timeA;
+            }).map(c => (
               <div key={c.id} className={`flex gap-5 animate-in fade-in slide-in-from-left-4 duration-400 ${isRTL ? 'flex-row-reverse' : ''}`}>
                 <img src={`https://ui-avatars.com/api/?name=${c.user}&background=333&color=fff`} className="w-10 h-10 rounded-xl shrink-0 shadow-xl" alt="avatar" />
                 <div className={`flex-1 bg-zinc-900/60 rounded-3xl p-5 border border-white/5 shadow-inner ${isRTL ? 'text-right' : 'text-left'}`}>
