@@ -271,6 +271,24 @@ const PublicationCard: React.FC<PublicationCardProps> = ({ pub, onLike, onDislik
     return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
   };
 
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `My Doll Club - ${pub.user}`,
+          text: pub.description || pub.content,
+          url: window.location.href,
+        });
+      } catch (err) {
+        console.log("Share cancelled or failed", err);
+      }
+    } else {
+      // Fallback: Copy to clipboard
+      navigator.clipboard.writeText(window.location.href);
+      alert(isRTL ? "تم نسخ الرابط!" : "Link copied to clipboard!");
+    }
+  };
+
   return (
     <div className={`glass-panel rounded-[2.5rem] border-white/5 overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-700 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.6)] bg-zinc-900/30 backdrop-blur-xl group relative ${pub.isPending ? 'opacity-70 grayscale-[50%]' : ''}`}>
       {pub.isPending && (
@@ -340,7 +358,7 @@ const PublicationCard: React.FC<PublicationCardProps> = ({ pub, onLike, onDislik
               <span className="text-[11px] font-black group-hover/comm:text-white tabular-nums">{pub.comments?.length || 0}</span>
             </button>
           </div>
-          <button className="flex items-center gap-3 text-zinc-700 hover:text-white transition-all active:scale-90">
+          <button onClick={handleShare} className="flex items-center gap-3 text-zinc-700 hover:text-white transition-all active:scale-90">
              <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center shadow-xl border border-white/5">
                 <i className="fa-solid fa-share-nodes text-sm"></i>
              </div>

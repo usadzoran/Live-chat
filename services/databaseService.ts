@@ -182,7 +182,7 @@ class DatabaseService {
         gems: amount,
         price,
         status: 'COMPLETED',
-        timestamp: serverTimestamp()
+        timestamp: new Date()
       });
       const userRef = doc(db_fs, 'users', uid);
       await updateDoc(userRef, { diamonds: increment(amount) });
@@ -210,8 +210,11 @@ class DatabaseService {
         
         if (data.timestamp && typeof (data.timestamp as any).toDate === 'function') {
           ts = (data.timestamp as Timestamp).toDate();
+        } else if (data.timestamp instanceof Date) {
+          ts = data.timestamp;
+        } else if (typeof data.timestamp === 'string') {
+          ts = new Date(data.timestamp);
         } else {
-          // If serverTimestamp is pending, use current local time
           ts = new Date();
         }
 
@@ -234,10 +237,12 @@ class DatabaseService {
   async addPublication(pub: Omit<Publication, 'id' | 'timestamp'>): Promise<void> {
     try {
       const pubRef = doc(collection(db_fs, 'publications'));
+      // Using new Date() instead of serverTimestamp() to ensure the doc
+      // is NOT null in the orderBy query during local latency compensation.
       await setDoc(pubRef, { 
         ...pub, 
         id: pubRef.id, 
-        timestamp: serverTimestamp(),
+        timestamp: new Date(), 
         likes: 0,
         dislikes: 0,
         comments: []
